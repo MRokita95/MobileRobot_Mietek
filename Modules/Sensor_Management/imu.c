@@ -9,11 +9,14 @@
 #include "imu.h"
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
+#include "imu_handle.h"
 
 
-IMU_ReturnCode_t IMU_Initialize(IMU_Handle_t *imuInstance, uint8_t i2c_addr)
+IMU_Handle_t IMU_Initialize(uint8_t i2c_addr)
 {
-	assert_param(hi2c != NULL);
+	IMU_Handle_t imuInstance = malloc(sizeof(struct IMU_Sensor_t));
+	
+	assert_param(imuInstance != NULL);
 	assert_param((i2c_addr == ICM20600_I2C_ADDR1) || (i2c_addr == ICM20600_I2C_ADDR2));
 
 	imuInstance->icm.driver.addr = i2c_addr;
@@ -23,20 +26,19 @@ IMU_ReturnCode_t IMU_Initialize(IMU_Handle_t *imuInstance, uint8_t i2c_addr)
 
 	ICM_initialize(&imuInstance->icm.driver, &imuInstance->i2c_instance);
 
-
-	imuInstance->ak.driver.addr = AK09918_I2C_ADDR;	//the only address
-	AK09918_err_type_t ak_status = AK_initialize(&imuInstance->ak.driver, &imuInstance->i2c_instance, AK09918_NORMAL);
-
-	imuInstance->ak.driver.device_ID = AK_getDeviceID(&imuInstance->icm.driver, &imuInstance->i2c_instance);
+	//AK Driver not ready
+	// imuInstance->ak.driver.addr = AK09918_I2C_ADDR;	//the only address
+	// AK09918_err_type_t ak_status = AK_initialize(&imuInstance->ak.driver, &imuInstance->i2c_instance, AK09918_NORMAL);
+	// imuInstance->ak.driver.device_ID = AK_getDeviceID(&imuInstance->icm.driver, &imuInstance->i2c_instance);
 
 	IMU_ReturnCode_t driver_status = (IMU_ReturnCode_t) imuInstance->icm.driver.status;
 	imuInstance->icm.driver.status = HAL_OK;
 
-	return driver_status;
+	return imuInstance;
 
 }
 
-IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t *imuInstance)
+IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t imuInstance)
 {
 	ICM_getAcceleration(&imuInstance->icm.driver,
 						&imuInstance->i2c_instance,
@@ -50,7 +52,7 @@ IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t *imuInstance)
 	return driver_status;
 }
 
-IMU_ReturnCode_t IMU_GetGyro(IMU_Handle_t *imuInstance)
+IMU_ReturnCode_t IMU_GetGyro(IMU_Handle_t imuInstance)
 {
 	ICM_getGyroscope(&imuInstance->icm.driver,
 			         &imuInstance->i2c_instance,
@@ -64,9 +66,9 @@ IMU_ReturnCode_t IMU_GetGyro(IMU_Handle_t *imuInstance)
 	return driver_status;
 }
 
-IMU_ReturnCode_t IMU_SetPowerMode(IMU_Handle_t *imuInstance, icm20600_power_type_t mode)
+IMU_ReturnCode_t IMU_SetPowerMode(IMU_Handle_t imuInstance, uint8_t mode)
 {
-	ICM_setPowerMode(&imuInstance->icm.driver, &imuInstance->i2c_instance, mode);
+	ICM_setPowerMode(&imuInstance->icm.driver, &imuInstance->i2c_instance, (icm20600_power_type_t)mode);
 
 	IMU_ReturnCode_t driver_status = (IMU_ReturnCode_t) imuInstance->icm.driver.status;
 	imuInstance->icm.driver.status = HAL_OK;
@@ -74,7 +76,7 @@ IMU_ReturnCode_t IMU_SetPowerMode(IMU_Handle_t *imuInstance, icm20600_power_type
 	return driver_status;
 }
 
-IMU_ReturnCode_t IMU_GetMagn(IMU_Handle_t *imuInstance)
+IMU_ReturnCode_t IMU_GetMagn(IMU_Handle_t imuInstance)
 {
 	AK09918_err_type_t status = AK_isDataReady(&imuInstance->ak.driver,
 												&imuInstance->i2c_instance);
@@ -97,7 +99,7 @@ IMU_ReturnCode_t IMU_GetMagn(IMU_Handle_t *imuInstance)
 
 }
 
-void IMU_CalcEuler(IMU_Handle_t *imuInstance)
+euler_angles_t IMU_CalcEuler(IMU_Handle_t imuInstance)
 {
 	imuInstance->prev_orient = imuInstance->orient;
 
@@ -139,9 +141,11 @@ void IMU_CalcEuler(IMU_Handle_t *imuInstance)
 														&gyro_calibrated,
 														&magn_calibrated);
 
+	return imuInstance->orient;
+
 }
 
-IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t *imuInstance)
+IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance)
 {
 	if (imuInstance->icm.calibration.samples == 0) {
 		imuInstance->icm.calibration.samples = 100;
@@ -175,14 +179,14 @@ IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t *imuInstance)
 	return imuInstance->icm.driver.status;
 }
 
-int16_t IMU_GetTemperature(IMU_Handle_t *imuInstance)
+int16_t IMU_GetTemperature(IMU_Handle_t imuInstance)
 {
 	imuInstance->icm.temperature =  ICM_getTemperature(&imuInstance->icm, &imuInstance->i2c_instance);
 
 	return imuInstance->icm.temperature;
 }
 
-IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t *imuInstance)
+IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance)
 {
     int32_t value_x_min = 0;
     int32_t value_x_max = 0;
@@ -271,4 +275,11 @@ IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t *imuInstance)
 
     return IMU_OK;
 
+}
+
+void IMU_Destroy(IMU_Handle_t imuInstance)
+{
+	if(imuInstance != NULL){
+		free(imuInstance);
+	}
 }

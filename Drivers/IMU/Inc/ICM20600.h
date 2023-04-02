@@ -80,8 +80,6 @@
 #define ICM20600_ZA_OFFSET_H            0x7d
 #define ICM20600_ZA_OFFSET_L            0x7e
 
-#define ICM20600_I2C_ADDR1              0x68
-#define ICM20600_I2C_ADDR2              0x69
 
 #define ICM20600_FIFO_EN_BIT            (1 << 6)
 #define ICM20600_FIFO_RST_BIT           (1 << 2)

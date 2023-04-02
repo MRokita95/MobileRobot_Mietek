@@ -22,6 +22,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "imu_handle.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -71,6 +73,7 @@ void StartDefaultTask(void const * argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+IMU_Handle_t imu_instance = NULL;
 /* USER CODE END 0 */
 
 /**
@@ -106,6 +109,8 @@ int main(void)
   MX_TIM2_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
+
+  imu_instance=IMU_Initialize(ICM20600_I2C_ADDR1);
 
   /* USER CODE END 2 */
 

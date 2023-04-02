@@ -9,12 +9,7 @@
 #define APP_SENSOR_MANAGEMENT_FILTERS_H_
 
 #include "stm32f4xx_hal.h"
-
-typedef struct {
-	float roll;
-	float pitch;
-	float yaw;
-} euler_angles_t;
+#include "sensors_common.h"
 
 
 typedef struct {
