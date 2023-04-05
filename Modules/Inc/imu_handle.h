@@ -2,6 +2,7 @@
 #define IMU_HANDLE_H_
 
 #include "sensors_common.h"
+#include "stm32f4xx_hal.h"
 
 
 #define ICM20600_I2C_ADDR1              0x68
@@ -46,11 +47,11 @@ typedef enum {
 
 //Public Interface
 
-IMU_Handle_t IMU_Initialize(uint8_t i2c_addr);
+IMU_Handle_t IMU_Initialize(uint8_t i2c_addr, I2C_HandleTypeDef* i2c_inst);
 
 void IMU_Destroy(IMU_Handle_t imuInstance);
 
-IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance);
+IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance, uint32_t measures);
 
 IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance);
 

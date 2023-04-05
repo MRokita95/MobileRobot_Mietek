@@ -12,7 +12,7 @@
 #include "imu_handle.h"
 
 
-IMU_Handle_t IMU_Initialize(uint8_t i2c_addr)
+IMU_Handle_t IMU_Initialize(uint8_t i2c_addr, I2C_HandleTypeDef* i2c_inst)
 {
 	IMU_Handle_t imuInstance = malloc(sizeof(struct IMU_Sensor_t));
 	
@@ -20,16 +20,23 @@ IMU_Handle_t IMU_Initialize(uint8_t i2c_addr)
 	assert_param((i2c_addr == ICM20600_I2C_ADDR1) || (i2c_addr == ICM20600_I2C_ADDR2));
 
 	imuInstance->icm.driver.addr = i2c_addr;
+	imuInstance->i2c_instance = i2c_inst;
 
 	imuInstance->read_timeout = HAL_MAX_DELAY;
 	imuInstance->write_timeout = HAL_MAX_DELAY;
 
-	ICM_initialize(&imuInstance->icm.driver, &imuInstance->i2c_instance);
+	//init calibration values
+	imuInstance->icm.calibration.offset[x] = 0;
+	imuInstance->icm.calibration.offset[y] = 0;
+	imuInstance->icm.calibration.offset[z] = 0;
+
+
+	ICM_initialize(&imuInstance->icm.driver, imuInstance->i2c_instance);
 
 	//AK Driver not ready
 	// imuInstance->ak.driver.addr = AK09918_I2C_ADDR;	//the only address
-	// AK09918_err_type_t ak_status = AK_initialize(&imuInstance->ak.driver, &imuInstance->i2c_instance, AK09918_NORMAL);
-	// imuInstance->ak.driver.device_ID = AK_getDeviceID(&imuInstance->icm.driver, &imuInstance->i2c_instance);
+	// AK09918_err_type_t ak_status = AK_initialize(&imuInstance->ak.driver, imuInstance->i2c_instance, AK09918_NORMAL);
+	// imuInstance->ak.driver.device_ID = AK_getDeviceID(&imuInstance->icm.driver, imuInstance->i2c_instance);
 
 	IMU_ReturnCode_t driver_status = (IMU_ReturnCode_t) imuInstance->icm.driver.status;
 	imuInstance->icm.driver.status = HAL_OK;
@@ -41,7 +48,7 @@ IMU_Handle_t IMU_Initialize(uint8_t i2c_addr)
 IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t imuInstance)
 {
 	ICM_getAcceleration(&imuInstance->icm.driver,
-						&imuInstance->i2c_instance,
+						imuInstance->i2c_instance,
 						&imuInstance->icm.accel[x],
 						&imuInstance->icm.accel[y],
 						&imuInstance->icm.accel[z]);
@@ -55,7 +62,7 @@ IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t imuInstance)
 IMU_ReturnCode_t IMU_GetGyro(IMU_Handle_t imuInstance)
 {
 	ICM_getGyroscope(&imuInstance->icm.driver,
-			         &imuInstance->i2c_instance,
+			         imuInstance->i2c_instance,
 					 &imuInstance->icm.speed[x],
 					 &imuInstance->icm.speed[y],
 					 &imuInstance->icm.speed[z]);
@@ -68,7 +75,7 @@ IMU_ReturnCode_t IMU_GetGyro(IMU_Handle_t imuInstance)
 
 IMU_ReturnCode_t IMU_SetPowerMode(IMU_Handle_t imuInstance, uint8_t mode)
 {
-	ICM_setPowerMode(&imuInstance->icm.driver, &imuInstance->i2c_instance, (icm20600_power_type_t)mode);
+	ICM_setPowerMode(&imuInstance->icm.driver, imuInstance->i2c_instance, (icm20600_power_type_t)mode);
 
 	IMU_ReturnCode_t driver_status = (IMU_ReturnCode_t) imuInstance->icm.driver.status;
 	imuInstance->icm.driver.status = HAL_OK;
@@ -79,14 +86,14 @@ IMU_ReturnCode_t IMU_SetPowerMode(IMU_Handle_t imuInstance, uint8_t mode)
 IMU_ReturnCode_t IMU_GetMagn(IMU_Handle_t imuInstance)
 {
 	AK09918_err_type_t status = AK_isDataReady(&imuInstance->ak.driver,
-												&imuInstance->i2c_instance);
+												imuInstance->i2c_instance);
 
 	if (status != AK09918_ERR_OK){
 		return IMU_ERROR;
 	}
 
 	status = AK_getData(&imuInstance->ak.driver,
-						&imuInstance->i2c_instance,
+						imuInstance->i2c_instance,
 						&imuInstance->ak.axis[x],
 						&imuInstance->ak.axis[y],
 						&imuInstance->ak.axis[z]);
@@ -104,7 +111,7 @@ euler_angles_t IMU_CalcEuler(IMU_Handle_t imuInstance)
 	imuInstance->prev_orient = imuInstance->orient;
 
 	ICM_getAcceleration(&imuInstance->icm.driver,
-							&imuInstance->i2c_instance,
+							imuInstance->i2c_instance,
 							&imuInstance->icm.accel[x],
 							&imuInstance->icm.accel[y],
 							&imuInstance->icm.accel[z]);
@@ -113,7 +120,7 @@ euler_angles_t IMU_CalcEuler(IMU_Handle_t imuInstance)
 	imuInstance->icm.driver.status = HAL_OK;
 
 	ICM_getGyroscope(&imuInstance->icm.driver,
-			         &imuInstance->i2c_instance,
+			         imuInstance->i2c_instance,
 					 &imuInstance->icm.speed[x],
 					 &imuInstance->icm.speed[y],
 					 &imuInstance->icm.speed[z]);
@@ -122,10 +129,10 @@ euler_angles_t IMU_CalcEuler(IMU_Handle_t imuInstance)
 	imuInstance->icm.driver.status = HAL_OK;
 
 	//get magnetometer data
-	IMU_GetMagn(imuInstance);
+	//IMU_GetMagn(imuInstance);
 
 	//should be done in seperate function or in main.c
-	//imuInstance->filter_callback = ComplementaryFilter;
+	imuInstance->filter_callback = ComplementaryFilter;
 
 	int16_t gyro_calibrated[3];
 	gyro_calibrated[x] = imuInstance->icm.speed[x] - imuInstance->icm.calibration.offset[x];
@@ -145,16 +152,16 @@ euler_angles_t IMU_CalcEuler(IMU_Handle_t imuInstance)
 
 }
 
-IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance)
+IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance, uint32_t measures)
 {
-	if (imuInstance->icm.calibration.samples == 0) {
-		imuInstance->icm.calibration.samples = 100;
-	}
+
+	imuInstance->icm.calibration.samples = measures;
+
 
 	for (int32_t smp = 0; smp < imuInstance->icm.calibration.samples; smp++){
 
 		ICM_getGyroscope(&imuInstance->icm.driver,
-				         &imuInstance->i2c_instance,
+				         imuInstance->i2c_instance,
 						 &imuInstance->icm.speed[x],
 						 &imuInstance->icm.speed[y],
 						 &imuInstance->icm.speed[z]);
@@ -181,7 +188,7 @@ IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance)
 
 int16_t IMU_GetTemperature(IMU_Handle_t imuInstance)
 {
-	imuInstance->icm.temperature =  ICM_getTemperature(&imuInstance->icm, &imuInstance->i2c_instance);
+	imuInstance->icm.temperature =  ICM_getTemperature(&imuInstance->icm, imuInstance->i2c_instance);
 
 	return imuInstance->icm.temperature;
 }
@@ -198,10 +205,10 @@ IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance)
     int32_t act_smp = 0;
 
 	AK09918_err_type_t status = AK_isDataReady(&imuInstance->ak.driver,
-												&imuInstance->i2c_instance);
+												imuInstance->i2c_instance);
 
 	if (status != AK09918_ERR_OK){
-		AK_reset(&imuInstance->ak.driver, &imuInstance->i2c_instance);
+		AK_reset(&imuInstance->ak.driver, imuInstance->i2c_instance);
 		osDelay(100);
 	}
 
@@ -210,7 +217,7 @@ IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance)
     int32_t z;
 
     status = AK_getData(&imuInstance->ak.driver,
-    										&imuInstance->i2c_instance,
+    										imuInstance->i2c_instance,
 											&x,
 											&y,
 											&z);
@@ -233,7 +240,7 @@ IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance)
     	if ((HAL_GetTick()/portTICK_PERIOD_MS - timeStart) >= imuInstance->ak.calibration.timeout)
     	{
 			status = AK_getData(&imuInstance->ak.driver,
-						&imuInstance->i2c_instance,
+						imuInstance->i2c_instance,
 						&x,
 						&y,
 						&z);

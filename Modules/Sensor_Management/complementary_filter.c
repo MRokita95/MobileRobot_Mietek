@@ -68,6 +68,8 @@ euler_angles_t ComplementaryFilter(int16_t *acc, int16_t *speed, int32_t *axis)
 
 	int16_t *gyro_speed = gyro_dead_zone(speed, filter->dead_zone);
 
+	//ADD NaN protection
+
 	filter->ang_speed.roll = 	(float)gyro_speed[x] * DEG_TO_RAD + sinf(filter->actual_orient.roll)*tanf(filter->actual_orient.pitch)*(float)gyro_speed[y] * DEG_TO_RAD
 													+ cosf(filter->actual_orient.roll)*tanf(filter->actual_orient.pitch)*(float)gyro_speed[z] * DEG_TO_RAD;
 

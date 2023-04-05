@@ -49,7 +49,7 @@ typedef struct {
 
 
 struct IMU_Sensor_t{
-	I2C_HandleTypeDef i2c_instance;
+	I2C_HandleTypeDef* i2c_instance;
 	Sensor_ICM_Handle_t icm;
 	Sensor_AK_Handle_t ak;
 	euler_angles_t orient;

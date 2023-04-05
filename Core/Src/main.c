@@ -21,6 +21,7 @@
 #include "cmsis_os.h"
 #include <stdio.h>
 #include <string.h>
+#include "FreeRTOSConfig.h"
 
 #include "imu_handle.h"
 
@@ -31,11 +32,24 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct
+{
+	const char *timer_name;
+	uint32_t period_ms;
+	UBaseType_t auto_reload;
+	uint8_t ID;
+	TimerCallbackFunction_t timer_handle;
+	StaticTimer_t buffer;
+} Timer_t;
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define CALIB_CNT     100u
+
+#define MESSAGE_LENGTH 120u
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,6 +67,25 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 osThreadId defaultTaskHandle;
+
+char message_buffer[MESSAGE_LENGTH];
+
+
+#define TIMER_NUMBERS 2u
+#define EULER_TIMER 0u
+BaseType_t TIMER_OK;
+void Timer_Task_calc(TimerHandle_t xTimer);
+static Timer_t Timers[TIMER_NUMBERS] =
+{
+		[EULER_TIMER] = {
+				.timer_name = "IMU Euler angles calc",
+				.period_ms = 10,
+				.auto_reload = 1u,
+				.ID = 1u,
+				.timer_handle = Timer_Task_calc,
+				.buffer = {0}
+		}
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -66,6 +99,9 @@ static void MX_TIM2_Init(void);
 static void MX_ADC1_Init(void);
 void StartDefaultTask(void const * argument);
 
+
+void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -73,7 +109,8 @@ void StartDefaultTask(void const * argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-IMU_Handle_t imu_instance = NULL;
+IMU_Handle_t imu_sensor = NULL;
+IMU_ReturnCode_t calibration_status;
 /* USER CODE END 0 */
 
 /**
@@ -110,7 +147,16 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  imu_instance=IMU_Initialize(ICM20600_I2C_ADDR1);
+  imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
+
+
+    calibration_status = IMU_GyroCalibration(imu_sensor, CALIB_CNT);
+
+    if (calibration_status == IMU_OK) {
+      send_uart(&huart2, "Calibrated OK \r\n");
+    } else {
+      send_uart(&huart2, "Gyro NOT calibrated \r\n");
+    }
 
   /* USER CODE END 2 */
 
@@ -124,6 +170,14 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
+  	TimerHandle_t xTimerHandle = xTimerCreateStatic(	Timers[EULER_TIMER].timer_name,
+									Timers[EULER_TIMER].period_ms / portTICK_PERIOD_MS,
+									Timers[EULER_TIMER].auto_reload,
+									NULL,
+									Timers[EULER_TIMER].timer_handle,
+									&Timers[EULER_TIMER].buffer);
+	assert_param(xTimerHandle != NULL);
+	xTimerStart(xTimerHandle, 0);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -152,6 +206,40 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+
+void send_uart(UART_HandleTypeDef* uart_instance, void const * argument)
+{
+	char* str = (char*)argument;
+	HAL_UART_Transmit(uart_instance, (uint8_t *)str, strlen(str), 100);
+}
+
+void Timer_Task_calc(TimerHandle_t xTimer)
+{
+	char *message = &message_buffer[0];
+
+	euler_angles_t orient = IMU_CalcEuler(imu_sensor);
+  static euler_angles_t prev_orient;
+
+	if (	(abs((int16_t)orient.roll - (int16_t)prev_orient.roll) >= 1u) ||
+			(abs((int16_t)orient.pitch - (int16_t)prev_orient.pitch) >= 1u) ||
+			(abs((int32_t)orient.yaw - (int32_t)prev_orient.yaw) >= 1u)
+		) {
+
+
+
+		sprintf(message_buffer, "Actual orient estimate: %i , %i , %i \r\n", 	(int16_t)orient.roll,
+																		(int16_t)orient.pitch,
+																		(int32_t)orient.yaw);
+
+    send_uart(&huart2, message);
+
+
+	}
+
+  prev_orient = orient;
+
+
 }
 
 /**
@@ -460,6 +548,19 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
+
+#ifdef configUSE_TIMERS && configSUPPORT_STATIC_ALLOCATION
+void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
+{
+	static StaticTask_t xTimerTaskTCB;
+	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
+
+	*ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
+	*ppxTimerTaskStackBuffer = uxTimerTaskStack;
+
+	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
+}
+#endif
 
 #ifdef  USE_FULL_ASSERT
 /**
