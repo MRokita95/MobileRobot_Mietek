@@ -63,8 +63,8 @@ euler_angles_t ComplementaryFilter(int16_t *acc, int16_t *speed, int32_t *axis)
 		alpha = 1.0;
 	}
 
-	filter->acc_orient.roll = 	atanf((float)acc[y] / (float)acc[z]);
-	filter->acc_orient.pitch = 	asinf((float)acc[x] / G_acc);
+	filter->acc_orient.roll = 	(float)atanf((float)acc[y] / (float)acc[z]);
+	filter->acc_orient.pitch = 	(float)asinf((float)acc[x] / G_acc);
 
 	int16_t *gyro_speed = gyro_dead_zone(speed, filter->dead_zone);
 

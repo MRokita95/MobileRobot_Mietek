@@ -8,36 +8,28 @@
 #ifndef APP_PID_PID_H_
 #define APP_PID_PID_H_
 
+#include "pid_handle.h"
 
-typedef struct{
-	// gains
-	float K;
-	float KI;
-	float KD;
+struct PID_controller_t{
+	//parameters
+	PID_parameters_t* params;
 
 	// low-pass filter time constans
-	const float tau;
-
-	//integrator limits
-	float outMin;
-	float outMax;
-
+	float tau;
 
 	uint32_t sample_time;
 
 	//controller memory
-	float prev_error;
-	float integrator;
+	int32_t prev_error;
+	int32_t integrator;
 	float prev_measurement;
 	float differentiator;
 
+	uint32_t last_tick;
+
 	float out;
 
-} PID_controller_t;
-
-void PID_Init(PID_controller_t *pid);
-
-void PID_Loop(PID_controller_t *pid, float setpoint, float measurement);
+};
 
 
 #endif /* APP_PID_PID_H_ */
