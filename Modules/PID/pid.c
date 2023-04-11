@@ -71,13 +71,15 @@ pid_output_t PID_Loop(PID_handle_t pid_instance, pid_input_t input, pid_input_t 
     return (pid_output_t)pid_instance->out;
 } 
 
-void PID_Reset(PID_handle_t pid)
+void PID_Reset(PID_handle_t pid, bool error_only)
 {
     pid->integrator = 0;
-    pid->out = 0.0f;
-    pid->prev_measurement = 0.0f;
-    pid->tau = 0u;
-    pid->sample_time = 0u;
-    pid->prev_error = 0;
-    pid->last_tick = HAL_GetTick();
+    if (!error_only){
+        pid->out = 0.0f;
+        pid->prev_measurement = 0.0f;
+        pid->tau = 0u;
+        pid->sample_time = 0u;
+        pid->prev_error = 0;
+        pid->last_tick = HAL_GetTick();
+    }
 }

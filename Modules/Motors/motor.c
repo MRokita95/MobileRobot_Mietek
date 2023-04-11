@@ -61,16 +61,24 @@ static void encoder_update_speed(encoder_t *encoder)
  */
 static void control_motor_pid(motor_handle_t* motor){
 
+    bool control_off = false;
     pid_input_t setpoint =  abs(motor->speed_setpoint);
     if (motor->speed_setpoint > 0){
         setDirection(&motor->direction, true);
-    } else {
+    } else if (motor->speed_setpoint < 0){
         setDirection(&motor->direction, false);
+    } else {
+        control_off = true;
     }
 
-    pid_output_t pwm_output = PID_Loop(motor->pid_handle, motor->encoder.act_speed, setpoint);
+    if (!control_off){
+        pid_output_t pwm_output = PID_Loop(motor->pid_handle, motor->encoder.act_speed, setpoint);
+        setPWM(&motor->speed, pwm_output);
+        
+    } else {
+        setPWM(&motor->speed, 0);
+    }
 
-    setPWM(&motor->speed, pwm_output);
 }
 
 
@@ -107,7 +115,7 @@ void motor_set_speed(motor_handle_t* motor, int32_t speed) {
         return;
     }
 
-    PID_Reset(motor->pid_handle);
+    PID_Reset(motor->pid_handle, true);
 
     motor->speed_setpoint = speed;
 }
@@ -120,4 +128,15 @@ void motor_task(motor_handle_t* motor){
         setDirection(&motor->direction, *motor->reference.forward);
         setPWM(&motor->speed, *motor->reference.speed);
     }
+}
+
+void motor_stop(motor_handle_t* motor){
+
+    if (!motor->encoder_present){
+        return;
+    }
+
+    PID_Reset(motor->pid_handle, false);
+
+    motor->speed_setpoint = 0;
 }

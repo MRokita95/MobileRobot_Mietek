@@ -26,6 +26,8 @@
 #include "imu_handle.h"
 #include "robot.h"
 
+#include "robot_app.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -145,7 +147,7 @@ void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
 IMU_Handle_t imu_sensor = NULL;
 IMU_ReturnCode_t calibration_status;
 
-static Mobile_Platform_t robot;
+Mobile_Platform_t robot;
 
 /* USER CODE END 0 */
 
@@ -719,9 +721,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM1) {
-    HAL_IncTick();
+      HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
+  if (htim->Instance == TIM6) {
+      if (robot.initialized){
+        Robot_UpdateMotionStatus(&robot);
+      }
+  }
 
   /* USER CODE END Callback 1 */
 }

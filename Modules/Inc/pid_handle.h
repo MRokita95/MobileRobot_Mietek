@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef uint16_t pid_output_t; 
 typedef uint16_t pid_input_t; 
@@ -25,6 +26,6 @@ PID_handle_t PID_Init(const PID_parameters_t* parameters);
 
 pid_output_t PID_Loop(PID_handle_t pid_instance, pid_input_t input, pid_input_t setpoint);
 
-void PID_Reset(PID_handle_t pid_instance);
+void PID_Reset(PID_handle_t pid_instance, bool error_only);
 
 #endif

@@ -1,5 +1,7 @@
 #include "robot.h"
 #include "main.h"
+#include "FreeRTOS.h"
+#include "cmsis_os.h"
 
 #define BIND_CONST -2
 
@@ -81,9 +83,20 @@ void Robot_Init(Mobile_Platform_t* robot){
 
         robot->motors[idx] = mot_handle;
     }
+    robot->distance.mode_on = false;
+    robot->distance.setpoint_distance = 0;
+    robot->distance.actual_distance = 0;
+    robot->distance.start_time = 0u;
+
+    robot->timer.mode_on = false;
+    robot->distance.actual_distance = 0;
+    robot->distance.start_time = 0u;
+
+
+    robot->initialized = true;
 }
 
-void Robot_GetSpeed(Mobile_Platform_t* robot){
+void Robot_UpdateMotionStatus(Mobile_Platform_t* robot){
 
     for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
         motor_handle_t* mot_handle = &robot->motors[idx];
@@ -92,6 +105,7 @@ void Robot_GetSpeed(Mobile_Platform_t* robot){
             motor_update_speed(mot_handle);
         } 
     }
+    Robot_CalcDistance(robot);
 }
 
 
@@ -104,11 +118,81 @@ void Robot_SetPath(Mobile_Platform_t* robot, int32_t speed, float angle) {
     }
 }
 
+void Robot_SetDistance(Mobile_Platform_t* robot, int32_t distance) {
+
+    robot->distance.mode_on = true;
+    robot->distance.actual_distance = 0;
+    robot->distance.setpoint_distance = distance;
+    robot->distance.start_time = HAL_GetTick()/portTICK_PERIOD_MS;
+    robot->distance.current_time = robot->distance.start_time;
+}
+
+void Robot_CalcDistance(Mobile_Platform_t* robot) {
+    
+    if (!robot->distance.mode_on){
+        return;
+    }
+
+    int32_t actual_dist = 0;
+    int32_t encoders = 0;
+    uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS) - (robot->distance.current_time);
+
+    for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
+        motor_handle_t* mot_handle = &robot->motors[idx];
+
+        if (mot_handle->encoder_present){
+            actual_dist = mot_handle->encoder.act_speed * dt;
+            encoders++;
+        } 
+    }
+    robot->distance.actual_distance = robot->distance.actual_distance + (actual_dist / encoders);
+    robot->distance.current_time += dt;
+}
+
+void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms)
+{
+    robot->timer.mode_on = true;
+    robot->timer.start_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
+    robot->timer.stop_time = ms;
+}
+
 void Robot_Task(Mobile_Platform_t* robot) {
+
+    if (robot->distance.mode_on){
+        if (robot->distance.actual_distance >= robot->distance.setpoint_distance){
+            Robot_Stop(robot);
+        }
+    }
+
+    if (robot->timer.mode_on){
+        uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
+        if (robot->timer.start_time + dt >= robot->timer.stop_time){
+            Robot_Stop(robot);
+        }
+    }
 
     for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
         motor_handle_t* mot_handle = &robot->motors[idx];
 
         motor_task(mot_handle);
+    }
+}
+
+void Robot_Stop(Mobile_Platform_t* robot) {
+
+    robot->distance.mode_on = false;
+    robot->distance.actual_distance = 0;
+    robot->distance.setpoint_distance = 0;
+    robot->distance.start_time = 0;
+    robot->distance.current_time = 0;
+
+    robot->timer.mode_on = false;
+    robot->timer.start_time = 0;
+    robot->timer.stop_time = 0;
+
+    for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
+        motor_handle_t* mot_handle = &robot->motors[idx];
+
+        motor_stop(mot_handle);
     }
 }
