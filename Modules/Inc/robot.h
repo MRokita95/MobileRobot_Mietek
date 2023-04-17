@@ -7,29 +7,22 @@
 
 #define MOTORS_CNT 4
 
-typedef struct {
-    bool mode_on;
-    int32_t actual_distance;   //in [mm]
-    int32_t setpoint_distance;   //in [mm]
-    uint32_t start_time;
-    uint32_t current_time;
-} distance_mode_t;
-
-typedef struct {
-    bool mode_on;
-    uint32_t start_time;
-    uint32_t stop_time;
-} time_mode_t;
-
 
 typedef struct{
 
-    bool initialized;
-    distance_mode_t distance;
-    time_mode_t timer;
+    int32_t speed_setpoint;     // [mm/s]
+    int32_t actual_speed;       // [mm/s]
+    uint32_t current_distance;  // [mm] from last movement command
     motor_handle_t* motors[MOTORS_CNT];
     
 } Mobile_Platform_t;
+
+
+typedef enum robot_status{
+    ROB_OFF = 0,
+    ROB_IDLE,
+    ROB_IN_PROGRESS,
+} robot_status_t;
 
 
 void Robot_Init(Mobile_Platform_t* robot);
@@ -40,12 +33,12 @@ void Robot_SetPath(Mobile_Platform_t* robot, int32_t speed, float angle);
 
 void Robot_SetDistance(Mobile_Platform_t* robot, int32_t distance);
 
-void Robot_CalcDistance(Mobile_Platform_t* robot);
-
 void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms);
 
 void Robot_Task(Mobile_Platform_t* robot);
 
 void Robot_Stop(Mobile_Platform_t* robot);
+
+robot_status_t Robot_Status(Mobile_Platform_t* robot);
 
 #endif

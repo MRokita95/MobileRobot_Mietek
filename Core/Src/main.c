@@ -19,17 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include <stdio.h>
-#include <string.h>
-#include "FreeRTOSConfig.h"
-
-#include "imu_handle.h"
-#include "robot.h"
-
-#include "robot_app.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "robot.h"
+#include "imu_handle.h"
+#include "robot_app.h"
 
 /* USER CODE END Includes */
 
@@ -77,13 +72,12 @@ I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim4;
-TIM_HandleTypeDef htim6;
+TIM_HandleTypeDef htim8;
+TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart2;
 
 osThreadId defaultTaskHandle;
-
 /* USER CODE BEGIN PV */
 char message_buffer[MESSAGE_LENGTH];
 
@@ -107,9 +101,11 @@ static Timer_t Timers[TIMER_NUMBERS] =
 
 
 void vTask_Robot(void const * argument);
+void vTask_Application(void const * argument);
 #define TASK_NUMBERS 5u
 
 #define ROBOT_TASK 1u
+#define ROBOT_APP 2u
 
 static Task_t Tasks[TASK_NUMBERS] =
 {
@@ -118,6 +114,13 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.task_active = 0,
 				.task_handle = vTask_Robot,
 				.priority = osPriorityNormal + 2
+		},
+
+    [ROBOT_APP] = {
+				.task_name = "Robot Task",
+				.task_active = 0,
+				.task_handle = vTask_Application,
+				.priority = osPriorityNormal + 1
 		}
 };
 /* USER CODE END PV */
@@ -130,14 +133,12 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM3_Init(void);
-static void MX_TIM4_Init(void);
-static void MX_TIM6_Init(void);
+static void MX_TIM10_Init(void);
+static void MX_TIM8_Init(void);
 void StartDefaultTask(void const * argument);
 
-
-void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
-
 /* USER CODE BEGIN PFP */
+void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
 
 /* USER CODE END PFP */
 
@@ -184,11 +185,12 @@ int main(void)
   MX_TIM2_Init();
   MX_ADC1_Init();
   MX_TIM3_Init();
-  MX_TIM4_Init();
-  MX_TIM6_Init();
+  MX_TIM10_Init();
+  MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_Base_Start_IT(&htim10);
 
-  imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
+  /*imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
 
 
     calibration_status = IMU_GyroCalibration(imu_sensor, CALIB_CNT);
@@ -198,6 +200,7 @@ int main(void)
     } else {
       send_uart(&huart2, "Gyro NOT calibrated \r\n");
     }
+    */
 
   /* USER CODE END 2 */
 
@@ -211,7 +214,8 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-  	TimerHandle_t xTimerHandle = xTimerCreateStatic(	Timers[EULER_TIMER].timer_name,
+  /*
+   * TimerHandle_t xTimerHandle = xTimerCreateStatic(	Timers[EULER_TIMER].timer_name,
 									Timers[EULER_TIMER].period_ms / portTICK_PERIOD_MS,
 									Timers[EULER_TIMER].auto_reload,
 									NULL,
@@ -219,6 +223,7 @@ int main(void)
 									&Timers[EULER_TIMER].buffer);
 	assert_param(xTimerHandle != NULL);
 	xTimerStart(xTimerHandle, 0);
+	*/
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -240,6 +245,17 @@ int main(void)
 			NULL );
 
 	assert_param(pdPASS == TASK_OK);
+
+
+
+  TASK_OK = xTaskCreate(Tasks[ROBOT_APP].task_handle,
+			Tasks[ROBOT_APP].task_name,
+			configMINIMAL_STACK_SIZE+100,
+			( void * ) NULL,
+			Tasks[ROBOT_APP].priority,
+			NULL );
+
+	assert_param(pdPASS == TASK_OK);
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -255,40 +271,6 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-}
-
-void send_uart(UART_HandleTypeDef* uart_instance, void const * argument)
-{
-	char* str = (char*)argument;
-	HAL_UART_Transmit(uart_instance, (uint8_t *)str, strlen(str), 100);
-}
-
-void Timer_Task_calc(TimerHandle_t xTimer)
-{
-	char *message = &message_buffer[0];
-
-	euler_angles_t orient = IMU_CalcEuler(imu_sensor);
-  static euler_angles_t prev_orient;
-
-	if (	(abs((int16_t)orient.roll - (int16_t)prev_orient.roll) >= 1u) ||
-			(abs((int16_t)orient.pitch - (int16_t)prev_orient.pitch) >= 1u) ||
-			(abs((int32_t)orient.yaw - (int32_t)prev_orient.yaw) >= 1u)
-		) {
-
-
-
-		sprintf(message_buffer, "Actual orient estimate: %i , %i , %i \r\n", 	(int16_t)orient.roll,
-																		(int16_t)orient.pitch,
-																		(int32_t)orient.yaw);
-
-    send_uart(&huart2, message);
-
-
-	}
-
-  prev_orient = orient;
-
-
 }
 
 /**
@@ -541,29 +523,30 @@ static void MX_TIM3_Init(void)
 }
 
 /**
-  * @brief TIM4 Initialization Function
+  * @brief TIM8 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM4_Init(void)
+static void MX_TIM8_Init(void)
 {
 
-  /* USER CODE BEGIN TIM4_Init 0 */
+  /* USER CODE BEGIN TIM8_Init 0 */
 
-  /* USER CODE END TIM4_Init 0 */
+  /* USER CODE END TIM8_Init 0 */
 
   TIM_Encoder_InitTypeDef sConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE BEGIN TIM4_Init 1 */
+  /* USER CODE BEGIN TIM8_Init 1 */
 
-  /* USER CODE END TIM4_Init 1 */
-  htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
-  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 65535;
-  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  /* USER CODE END TIM8_Init 1 */
+  htim8.Instance = TIM8;
+  htim8.Init.Prescaler = 0;
+  htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim8.Init.Period = 65535;
+  htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim8.Init.RepetitionCounter = 0;
+  htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
@@ -573,57 +556,50 @@ static void MX_TIM4_Init(void)
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
   sConfig.IC2Filter = 15;
-  if (HAL_TIM_Encoder_Init(&htim4, &sConfig) != HAL_OK)
+  if (HAL_TIM_Encoder_Init(&htim8, &sConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim8, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM4_Init 2 */
+  /* USER CODE BEGIN TIM8_Init 2 */
 
-  /* USER CODE END TIM4_Init 2 */
+  /* USER CODE END TIM8_Init 2 */
 
 }
 
 /**
-  * @brief TIM6 Initialization Function
+  * @brief TIM10 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM6_Init(void)
+static void MX_TIM10_Init(void)
 {
 
-  /* USER CODE BEGIN TIM6_Init 0 */
+  /* USER CODE BEGIN TIM10_Init 0 */
 
-  /* USER CODE END TIM6_Init 0 */
+  /* USER CODE END TIM10_Init 0 */
 
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE BEGIN TIM10_Init 1 */
 
-  /* USER CODE BEGIN TIM6_Init 1 */
-
-  /* USER CODE END TIM6_Init 1 */
-  htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 7200-1;
-  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 1000-1;
-  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 7200-1;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 1000-1;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM6_Init 2 */
+  /* USER CODE BEGIN TIM10_Init 2 */
 
-  /* USER CODE END TIM6_Init 2 */
+  /* USER CODE END TIM10_Init 2 */
 
 }
 
@@ -667,6 +643,7 @@ static void MX_USART2_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -674,19 +651,136 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_MOT1_DIR_Pin|GPIO_MOT2_DIR_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_MOT3_DIR_Pin|GPIO_MOT4_DIR_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : GPIO_MOT1_DIR_Pin GPIO_MOT2_DIR_Pin */
+  GPIO_InitStruct.Pin = GPIO_MOT1_DIR_Pin|GPIO_MOT2_DIR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : GPIO_MOT3_DIR_Pin GPIO_MOT4_DIR_Pin */
+  GPIO_InitStruct.Pin = GPIO_MOT3_DIR_Pin|GPIO_MOT4_DIR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
 
+void send_uart(UART_HandleTypeDef* uart_instance, void const * argument)
+{
+	char* str = (char*)argument;
+	HAL_UART_Transmit(uart_instance, (uint8_t *)str, strlen(str), 100);
+}
+
+void Timer_Task_calc(TimerHandle_t xTimer)
+{
+	char *message = &message_buffer[0];
+
+	euler_angles_t orient = IMU_CalcEuler(imu_sensor);
+  static euler_angles_t prev_orient;
+
+	if (	(abs((int16_t)orient.roll - (int16_t)prev_orient.roll) >= 1u) ||
+			(abs((int16_t)orient.pitch - (int16_t)prev_orient.pitch) >= 1u) ||
+			(abs((int32_t)orient.yaw - (int32_t)prev_orient.yaw) >= 1u)
+		) {
+
+
+
+		sprintf(message_buffer, "Actual orient estimate: %i , %i , %i \r\n", 	(int16_t)orient.roll,
+																		(int16_t)orient.pitch,
+																		(int32_t)orient.yaw);
+
+    send_uart(&huart2, message);
+
+
+	}
+
+  prev_orient = orient;
+
+
+}
+
+void vTask_Application(void const * argument){
+
+	
+  for(;;){
+    
+      static bool cond = true;
+      if(cond){
+        ROBOT_MOVE_SPEED_TIME(190, 0, 8000);
+        cond = false;
+      }
+
+      vTaskSuspend(NULL);
+       // vTaskDelay(70000);
+
+        //vTaskDelay(7000);
+        //ROBOT_MOVE_SPEED_TIME(-80, 0, 5000);
+
+
+
+
+
+    }
+
+
+}
+
+#define MAIN_TASK_FREQUENCY 100U
+
 void vTask_Robot(void const * argument){
 
+  char *message = &message_buffer[0];
   Robot_Init(&robot);
-  //TODO Time Handle and block task
+
+  TickType_t xNextWakeTime;
+
+  const TickType_t xBlockTime = MAIN_TASK_FREQUENCY/portTICK_RATE_MS;
+  xNextWakeTime = xTaskGetTickCount();
+
   for(;;){
-    Robot_Task(&robot);
+
+    vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+    
+
+		Robot_UpdateMotionStatus(&robot);
+
+		Robot_Task(&robot);
+
+    if (robot.speed_setpoint != 0){
+
+      sprintf(message_buffer, "SETPOINT SPEED: %i , ACTUAL SPEED: %i, PWM MOT 1: %i \r\n", 	
+      robot.speed_setpoint, robot.actual_speed, robot.motors[0]->speed.set_speed);
+      send_uart(&huart2, message);
+
+
+    }
+
   }
 }
 
+
+#ifdef configUSE_TIMERS && configSUPPORT_STATIC_ALLOCATION
+void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
+{
+	static StaticTask_t xTimerTaskTCB;
+	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
+
+	*ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
+	*ppxTimerTaskStackBuffer = uxTimerTaskStack;
+
+	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
+}
+#endif
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -721,12 +815,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM1) {
-      HAL_IncTick();
+    HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-  if (htim->Instance == TIM6) {
-      if (robot.initialized){
-        Robot_UpdateMotionStatus(&robot);
+  if (htim->Instance == TIM10) {
+      if (Robot_Status(&robot) != ROB_OFF){
+        
+    	//TickType_t current_tick = HAL_GetTick();
+    	//Robot_UpdateMotionStatus(&robot);
+    	//__HAL_TIM_CLEAR_IT(htim, TIM_IT_UPDATE);
+
       }
   }
 
@@ -748,19 +846,6 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef configUSE_TIMERS && configSUPPORT_STATIC_ALLOCATION
-void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
-{
-	static StaticTask_t xTimerTaskTCB;
-	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
-
-	*ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
-	*ppxTimerTaskStackBuffer = uxTimerTaskStack;
-
-	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
-}
-#endif
-
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
@@ -775,10 +860,6 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
-	printf("Wrong parameters value: file %s on line %d\r\n", file, line);
-	while(1){
-		;
-	}
 }
 #endif /* USE_FULL_ASSERT */
 

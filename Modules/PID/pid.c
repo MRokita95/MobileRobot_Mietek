@@ -43,14 +43,14 @@ pid_output_t PID_Loop(PID_handle_t pid_instance, pid_input_t input, pid_input_t 
 
     // could be changed to Time_Delta :)
     uint32_t current_tick = HAL_GetTick();
-    uint32_t delta_ms = current_tick/portTICK_PERIOD_MS - pid_instance->last_tick/portTICK_PERIOD_MS;
+    uint32_t delta_ms = current_tick - pid_instance->last_tick;
     float delta_s = (float)delta_ms / 1000.f;
     float i_calc = (float)pid_instance->integrator + pid_instance->params->KI * ((float)error * delta_s);
     
     //simpler version
-    //float d_calc = pid_instance->params->KD * (float)(error - pid_instance->prev_error);
+    float d_calc = pid_instance->params->KD * (float)(error - pid_instance->prev_error);
 
-    float d_calc = pid_instance->params->KD * (float)(error - pid_instance->prev_error)/delta_s;
+    //float d_calc = pid_instance->params->KD * (float)(error - pid_instance->prev_error)/delta_s;
 
     //anti wind-up
     if (i_calc > pid_instance->params->integratorLimit){

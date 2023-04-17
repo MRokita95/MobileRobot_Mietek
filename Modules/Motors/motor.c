@@ -51,7 +51,7 @@ static void encoder_update_speed(encoder_t *encoder)
 	encoder->pulse_count = (int16_t)__HAL_TIM_GET_COUNTER(encoder->tim_handle);
 	__HAL_TIM_SET_COUNTER(encoder->tim_handle, 0);
 
-	encoder->act_speed = (encoder->pulse_count * TIMER_FREQENCY * SECOND_IN_MINUTE) / encoder->resolution;
+	encoder->act_speed = (int32_t)(encoder->pulse_count * TIMER_FREQENCY * SECOND_IN_MINUTE) / (int32_t)encoder->resolution;
 }
 
 /**
@@ -72,8 +72,9 @@ static void control_motor_pid(motor_handle_t* motor){
     }
 
     if (!control_off){
-        pid_output_t pwm_output = PID_Loop(motor->pid_handle, motor->encoder.act_speed, setpoint);
+        pid_output_t pwm_output = PID_Loop(motor->pid_handle, abs(motor->encoder.act_speed), setpoint);
         setPWM(&motor->speed, pwm_output);
+        //setPWM(&motor->speed, 0);
         
     } else {
         setPWM(&motor->speed, 0);
@@ -88,12 +89,14 @@ void motor_init(motor_handle_t* motor, bool encoder, reference_motor_t* ref) {
     motor->speed_setpoint = 0;
     motor->encoder_present = encoder;
 
+    HAL_TIM_PWM_Start(motor->speed.tim_handle, motor->speed.tim_channel);
+
     setDirection(&motor->direction, true);
     setPWM(&motor->speed, 0);
-    HAL_TIM_PWM_Start(motor->speed.tim_handle, motor->speed.tim_channel);
 
     if (motor->encoder_present) {
         motor->pid_handle = PID_Init(&motor->pid_params);
+        HAL_TIM_Encoder_Start(motor->encoder.tim_handle, TIM_CHANNEL_ALL);
         __HAL_TIM_SET_COUNTER(motor->encoder.tim_handle, 0);
         motor->encoder.pulse_count = 0;
         motor->encoder.resolution = FRONT_MOTOR_GEAR_RATIO * ENCODER_RESOLUTION * TIMER_CONF_BOTH_EDGE_T1T2;
@@ -125,18 +128,19 @@ void motor_task(motor_handle_t* motor){
     if (motor->encoder_present){    
         control_motor_pid(motor);
     } else {
-        setDirection(&motor->direction, *motor->reference.forward);
+        //no idea why
+        setDirection(&motor->direction, !(*motor->reference.forward));
         setPWM(&motor->speed, *motor->reference.speed);
     }
 }
 
 void motor_stop(motor_handle_t* motor){
 
+    motor->speed_setpoint = 0;
+
     if (!motor->encoder_present){
         return;
     }
 
     PID_Reset(motor->pid_handle, false);
-
-    motor->speed_setpoint = 0;
 }
