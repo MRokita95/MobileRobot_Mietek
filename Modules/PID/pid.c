@@ -73,8 +73,10 @@ pid_output_t PID_Loop(PID_handle_t pid_instance, pid_input_t input, pid_input_t 
 
 void PID_Reset(PID_handle_t pid, bool error_only)
 {
-    pid->integrator = 0;
+    //pid->integrator = 0;
+    //pid->prev_error = 0;
     if (!error_only){
+        pid->integrator = 0;
         pid->out = 0.0f;
         pid->prev_measurement = 0.0f;
         pid->tau = 0u;

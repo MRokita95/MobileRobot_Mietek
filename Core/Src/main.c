@@ -25,6 +25,7 @@
 #include "robot.h"
 #include "imu_handle.h"
 #include "robot_app.h"
+#include "comm.h"
 
 /* USER CODE END Includes */
 
@@ -46,7 +47,7 @@ typedef struct
 	char *task_name;
 	uint8_t task_active;
 	osSemaphoreId activ_semaphore;
-	TaskFunction_t task_handle;
+	TaskFunction_t task_function;
 	UBaseType_t priority;
 } Task_t;
 
@@ -102,24 +103,33 @@ static Timer_t Timers[TIMER_NUMBERS] =
 
 void vTask_Robot(void const * argument);
 void vTask_Application(void const * argument);
+void vTask_Communication(void const * argument);
 #define TASK_NUMBERS 5u
 
 #define ROBOT_TASK 1u
 #define ROBOT_APP 2u
+#define COMM_TASK 3u
 
 static Task_t Tasks[TASK_NUMBERS] =
 {
 		[ROBOT_TASK] = {
 				.task_name = "Robot Task",
-				.task_active = 0,
-				.task_handle = vTask_Robot,
+				.task_active = 1,
+				.task_function = vTask_Robot,
 				.priority = osPriorityNormal + 2
 		},
 
     [ROBOT_APP] = {
 				.task_name = "Robot Task",
 				.task_active = 0,
-				.task_handle = vTask_Application,
+				.task_function = vTask_Application,
+				.priority = osPriorityNormal + 1
+		},
+
+    [COMM_TASK] = {
+				.task_name = "Comm Task",
+				.task_active = 1,
+				.task_function = vTask_Communication,
 				.priority = osPriorityNormal + 1
 		}
 };
@@ -237,25 +247,22 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-    BaseType_t TASK_OK = xTaskCreate(Tasks[ROBOT_TASK].task_handle,
-			Tasks[ROBOT_TASK].task_name,
-			configMINIMAL_STACK_SIZE+100,
-			( void * ) NULL,
-			Tasks[ROBOT_TASK].priority,
-			NULL );
 
-	assert_param(pdPASS == TASK_OK);
+  for (uint8_t task_idx = 0; task_idx < TASK_NUMBERS; task_idx ++){
 
+      if (Tasks[task_idx].task_active != 0) {
 
+        BaseType_t TASK_OK = xTaskCreate(Tasks[ROBOT_TASK].task_function,
+          Tasks[task_idx].task_name,
+          configMINIMAL_STACK_SIZE+100,
+          ( void * ) NULL,
+          Tasks[ROBOT_TASK].priority,
+          NULL );
 
-  TASK_OK = xTaskCreate(Tasks[ROBOT_APP].task_handle,
-			Tasks[ROBOT_APP].task_name,
-			configMINIMAL_STACK_SIZE+100,
-			( void * ) NULL,
-			Tasks[ROBOT_APP].priority,
-			NULL );
+        assert_param(pdPASS == TASK_OK);
+      }
+  }
 
-	assert_param(pdPASS == TASK_OK);
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -714,25 +721,18 @@ void vTask_Application(void const * argument){
 	
   for(;;){
     
-      static bool cond = true;
-      if(cond){
-        ROBOT_MOVE_SPEED_TIME(190, 0, 8000);
-        cond = false;
-      }
-
-      vTaskSuspend(NULL);
-       // vTaskDelay(70000);
-
-        //vTaskDelay(7000);
-        //ROBOT_MOVE_SPEED_TIME(-80, 0, 5000);
-
-
-
-
 
     }
 
 
+}
+
+void vTask_Communication(void const * argument){
+
+    for(;;){
+      
+        Comm_Task();
+    }
 }
 
 #define MAIN_TASK_FREQUENCY 100U
@@ -758,8 +758,9 @@ void vTask_Robot(void const * argument){
 
     if (robot.speed_setpoint != 0){
 
-      sprintf(message_buffer, "SETPOINT SPEED: %i , ACTUAL SPEED: %i, PWM MOT 1: %i \r\n", 	
-      robot.speed_setpoint, robot.actual_speed, robot.motors[0]->speed.set_speed);
+      TickType_t act_time = HAL_GetTick();
+      sprintf(message_buffer, "T: %u SETPOINT SPEED: %i , ACTUAL SPEED: %i, PWM MOT 1: %i \r\n", 	
+      act_time, robot.speed_setpoint, robot.actual_speed, robot.motors[0]->speed.set_speed);
       send_uart(&huart2, message);
 
 

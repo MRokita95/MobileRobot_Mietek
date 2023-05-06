@@ -5,6 +5,8 @@
         "i2c_utils.h": "c",
         "pid.h": "c",
         "pid_handle.h": "c",
-        "cmsis_os.h": "c"
+        "cmsis_os.h": "c",
+        "stdbool.h": "c",
+        "mobile_platform.h": "c"
     }
 }

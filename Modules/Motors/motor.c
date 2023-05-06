@@ -31,7 +31,8 @@ static void setPWM(speed_t* speed, uint16_t set_speed) {
  * @param forward
  */
 static void setDirection(direction_t* dir, bool forward) {
-    if (forward){
+    //reverted logic
+    if (!forward){
         HAL_GPIO_WritePin(dir->dir_gpio_port, dir->dir_gpio_pin, GPIO_PIN_SET);
     } else {
         HAL_GPIO_WritePin(dir->dir_gpio_port, dir->dir_gpio_pin, GPIO_PIN_RESET);

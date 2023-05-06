@@ -3,11 +3,9 @@
 
 #include <stdint.h>
 #include "robot.h"
+#include "commands.h"
 
 extern Mobile_Platform_t robot;
-
-static uint32_t program_counter = 1;
-static uint32_t current_step = 1;
 
 /**
  * @brief file contains Robot macros (functions wrappers) for application creation
@@ -16,52 +14,57 @@ static uint32_t current_step = 1;
 
 #define ROBOT_MOVE_DISTANCE(distance, speed) \
     do{ \
-        static uint32_t step_no = 0u; \
-        if (1 == 1) { \
-            if (Robot_Status(&robot) == ROB_IDLE) { \
-                Robot_SetPath(&robot, speed, 0); \
-                Robot_SetDistance(&robot, distance); \
-                current_step++; \
-            } \
-        } \
-        else { \
-            step_no = program_counter; \
-            program_counter++; \
-        } \
+        command_t cmd; \
+        cmd.type = RUN_FOR_DIST; \
+        cmd.distance = distance; \
+        cmd.speed = speed; \
+        command_add(cmd); \
     }while(0)
 
 
-#define ROBOT_MOVE_SPEED(speed, angle) \
+#define ROBOT_MOVE_SPEED(speed, time) \
     do{ \
-        static uint32_t step_no = 0u; \
-        if (1 == 1) { \
-            if (Robot_Status(&robot) == ROB_IDLE) { \
-                Robot_SetPath(&robot, speed, angle); \
-                current_step++; \
-            } \
-        } \
-        else { \
-            step_no = program_counter; \
-            program_counter++; \
-        } \
+        command_t cmd; \
+        cmd.type = RUN_FOR_TIME; \
+        cmd.speed = speed; \
+        cmd.time = time; \
+        command_add(cmd); \
     }while(0)
 
 
-#define ROBOT_MOVE_SPEED_TIME(speed, angle, timeout) \
+#define ROBOT_MOVE_TO_POINT(speed, X, Y) \
     do{ \
-        static uint32_t step_no = 0u; \
-        if (1 == 1) { \
-            if (Robot_Status(&robot) == ROB_IDLE) { \
-                Robot_SetPath(&robot, speed, angle); \
-                Robot_StartTimer(&robot, timeout); \
-                current_step++; \
-            } \
-        } \
-        else { \
-            step_no = program_counter; \
-            program_counter++; \
-        } \
+        command_t cmd; \
+        cmd.type = RUN_TO_POINT; \
+        cmd.speed = speed; \
+        cmd.point.x_pos = X; \
+        cmd.point.y_pos = Y; \
+        command_add(cmd); \
     }while(0)
 
+
+#define ROBOT_WAIT(time) \
+    do{ \
+        command_t cmd; \
+        cmd.type = WAIT_TIME; \
+        cmd.time = time; \
+        command_add(cmd); \
+    }while(0)
+
+
+#define ROBOT_ON() \
+    do{ \
+        command_t cmd; \
+        cmd.type = START_ROB; \
+        command_add(cmd); \
+    }while(0)
+
+
+#define ROBOT_OFF() \
+    do{ \
+        command_t cmd; \
+        cmd.type = STOP_ROB; \
+        command_add(cmd); \
+    }while(0)
 
 #endif
