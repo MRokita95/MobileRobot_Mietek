@@ -7,11 +7,13 @@
 #define MAX_COMMANDS_CNT 100u
 
 typedef enum{
-    START_ROB = 0,
+    UNDEF = 0,
+    START_ROB,
     STOP_ROB,
     RUN_FOR_TIME,
     RUN_FOR_DIST,
     RUN_TO_POINT,
+    ROTATE,
     WAIT_TIME
 } command_type_t;
 
@@ -32,6 +34,7 @@ typedef struct {
     int16_t speed;
     rob_coord_t point;
     int32_t distance;
+    int16_t angle;
 } command_t;
 
 typedef enum{

@@ -48,7 +48,7 @@ void Robot_UpdateMotionStatus(Mobile_Platform_t* robot);
 
 void Robot_SetSpeed(Mobile_Platform_t* robot, int32_t speed);
 
-void Robot_SetDistance(Mobile_Platform_t* robot, int32_t distance);
+void Robot_SetDistance(Mobile_Platform_t* robot, float distance);
 
 void Robot_MoveToPoint(Mobile_Platform_t* robot, int32_t speed, int32_t x_pos, int32_t y_pos);
 

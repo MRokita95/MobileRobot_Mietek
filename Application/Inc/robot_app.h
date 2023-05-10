@@ -12,42 +12,52 @@ extern Mobile_Platform_t robot;
  * 
  */
 
-#define ROBOT_MOVE_DISTANCE(distance, speed) \
+#define ROBOT_MOVE_DISTANCE(setp_speed, setp_distance) \
     do{ \
         command_t cmd; \
         cmd.type = RUN_FOR_DIST; \
-        cmd.distance = distance; \
-        cmd.speed = speed; \
+        cmd.distance = setp_distance; \
+        cmd.speed = setp_speed; \
         command_add(cmd); \
     }while(0)
 
 
-#define ROBOT_MOVE_SPEED(speed, time) \
+#define ROBOT_MOVE_SPEED(setp_speed, setp_time) \
     do{ \
         command_t cmd; \
         cmd.type = RUN_FOR_TIME; \
-        cmd.speed = speed; \
-        cmd.time = time; \
+        cmd.speed = setp_speed; \
+        cmd.time = setp_time; \
         command_add(cmd); \
     }while(0)
 
 
-#define ROBOT_MOVE_TO_POINT(speed, X, Y) \
+#define ROBOT_MOVE_TO_POINT(setp_speed, setp_X, setp_Y) \
     do{ \
         command_t cmd; \
         cmd.type = RUN_TO_POINT; \
-        cmd.speed = speed; \
-        cmd.point.x_pos = X; \
-        cmd.point.y_pos = Y; \
+        cmd.speed = setp_speed; \
+        cmd.point.x_pos = setp_X; \
+        cmd.point.y_pos = setp_Y; \
         command_add(cmd); \
     }while(0)
 
 
-#define ROBOT_WAIT(time) \
+#define ROBOT_ROTATE(setp_speed, setp_angle) \
+    do{ \
+        command_t cmd; \
+        cmd.type = ROTATE; \
+        cmd.speed = setp_speed; \
+        cmd.angle = setp_angle; \
+        command_add(cmd); \
+    }while(0)
+
+
+#define ROBOT_WAIT(setp_time) \
     do{ \
         command_t cmd; \
         cmd.type = WAIT_TIME; \
-        cmd.time = time; \
+        cmd.time = setp_time; \
         command_add(cmd); \
     }while(0)
 

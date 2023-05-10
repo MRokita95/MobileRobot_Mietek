@@ -99,7 +99,7 @@ static Timer_t Timers[TIMER_NUMBERS] =
 		}
 };
 /* USER CODE BEGIN PV */
-
+void Robot_Application1(void);
 
 void vTask_Robot(void const * argument);
 void vTask_Application(void const * argument);
@@ -252,11 +252,11 @@ int main(void)
 
       if (Tasks[task_idx].task_active != 0) {
 
-        BaseType_t TASK_OK = xTaskCreate(Tasks[ROBOT_TASK].task_function,
+        BaseType_t TASK_OK = xTaskCreate(Tasks[task_idx].task_function,
           Tasks[task_idx].task_name,
           configMINIMAL_STACK_SIZE+100,
           ( void * ) NULL,
-          Tasks[ROBOT_TASK].priority,
+          Tasks[task_idx].priority,
           NULL );
 
         assert_param(pdPASS == TASK_OK);
@@ -664,6 +664,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_MOT3_DIR_Pin|GPIO_MOT4_DIR_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin : GPIO_USER_BUTTON_Pin */
+  GPIO_InitStruct.Pin = GPIO_USER_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIO_USER_BUTTON_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pins : GPIO_MOT1_DIR_Pin GPIO_MOT2_DIR_Pin */
   GPIO_InitStruct.Pin = GPIO_MOT1_DIR_Pin|GPIO_MOT2_DIR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -677,6 +683,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
@@ -749,22 +759,11 @@ void vTask_Robot(void const * argument){
 
   for(;;){
 
-    vTaskDelayUntil( &xNextWakeTime, xBlockTime );
-    
+	vTaskDelayUntil( &xNextWakeTime, xBlockTime );
 
-		Robot_UpdateMotionStatus(&robot);
+	Robot_UpdateMotionStatus(&robot);
 
-		Robot_Task(&robot);
-
-    if (robot.speed_setpoint != 0){
-
-      TickType_t act_time = HAL_GetTick();
-      sprintf(message_buffer, "T: %u SETPOINT SPEED: %i , ACTUAL SPEED: %i, PWM MOT 1: %i \r\n", 	
-      act_time, robot.speed_setpoint, robot.actual_speed, robot.motors[0]->speed.set_speed);
-      send_uart(&huart2, message);
-
-
-    }
+	Robot_Task(&robot);
 
   }
 }
@@ -782,6 +781,47 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, Stack
 	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
 #endif
+
+
+void Robot_Application1()
+{
+	ROBOT_WAIT(2000);
+	ROBOT_MOVE_DISTANCE(100, 300);
+	ROBOT_WAIT(2000);
+	ROBOT_MOVE_TO_POINT(200, 100, 0);
+	ROBOT_WAIT(2000);
+	ROBOT_ROTATE(75, 90);
+	ROBOT_WAIT(2000);
+	//ROBOT_MOVE_DISTANCE(100, 300);
+	//ROBOT_WAIT(2000);
+	//ROBOT_MOVE_TO_POINT(200, 400, 400);
+
+
+    //ROBOT_MOVE_SPEED(100, 1000);
+    //ROBOT_WAIT(2000);
+    //ROBOT_MOVE_SPEED(-100, 1000);
+    //ROBOT_WAIT(2000);
+    //ROBOT_MOVE_DISTANCE(100, 300);
+	//ROBOT_WAIT(2000);
+	//ROBOT_WAIT(2000);
+	//ROBOT_ROTATE(100, 90);
+
+    //ROBOT_MOVE_TO_POINT(80, 50, 50);
+
+
+    //ROBOT_WAIT(2000);
+    //ROBOT_WAIT(5000);
+    //ROBOT_MOVE_SPEED(-100, 1000);
+}
+
+// EXTI Line13 External Interrupt ISR Handler CallBackFun
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+
+    if(GPIO_Pin == GPIO_USER_BUTTON_Pin) // If The INT Source Is EXTI Line9 (A9 Pin)
+    {
+        Robot_Application1();
+    }
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -820,13 +860,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
   /* USER CODE BEGIN Callback 1 */
   if (htim->Instance == TIM10) {
-      if (Robot_Status(&robot) != ROB_OFF){
+      // if (Robot_Status(&robot) != ROB_OFF){
         
     	//TickType_t current_tick = HAL_GetTick();
     	//Robot_UpdateMotionStatus(&robot);
     	//__HAL_TIM_CLEAR_IT(htim, TIM_IT_UPDATE);
 
-      }
+      // }
   }
 
   /* USER CODE END Callback 1 */

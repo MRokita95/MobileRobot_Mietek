@@ -52,13 +52,24 @@ command_buff_status_t command_add(command_t command){
 command_buff_status_t command_get_next(command_t* next_command){
     command_t *cmd = m_commands;
 
+    if (m_ringbuff_cmd.read_idx == -1 && m_ringbuff_cmd.write_idx == -1){
+        return BUFF_EMPTY;
+    }
+
+    if (m_ringbuff_cmd.read_idx == m_ringbuff_cmd.write_idx){
+            m_ringbuff_cmd.buff_status = BUFF_EMPTY;
+        }
+
     if (m_ringbuff_cmd.read_idx == -1){
         m_ringbuff_cmd.read_idx = 0;
     }
 
     cmd += m_ringbuff_cmd.read_idx;
 
-    if (cmd->status != IDLE){
+    if (cmd->status == UNDEF) {
+        return BUFF_EMPTY;
+    }
+    else if (cmd->status != IDLE){
         m_ringbuff_cmd.buff_status = BUFF_FULL;
         return BUFF_FULL;
     }
@@ -70,27 +81,17 @@ command_buff_status_t command_get_next(command_t* next_command){
 
     m_ringbuff_cmd.current_cmd = cmd;
 
-    next_command = cmd;
-    
-    if (m_ringbuff_cmd.read_idx == m_ringbuff_cmd.write_idx){
-        m_ringbuff_cmd.buff_status = BUFF_EMPTY;
-    }
+    *next_command = *cmd;
 
     return m_ringbuff_cmd.buff_status;
 }
 
 void command_set_status(command_status_t status){
-    command_t *cmd = m_commands;
-
-    cmd += m_ringbuff_cmd.read_idx;
-    cmd->status = status;
+	m_ringbuff_cmd.current_cmd->status = status;
 }
 
 command_status_t command_actual_status(){
-    command_t *cmd = m_commands;
-
-    cmd += m_ringbuff_cmd.read_idx;
-    return cmd->status;
+    return m_ringbuff_cmd.current_cmd->status;
 }
 
 command_buff_status_t command_buff_status(){

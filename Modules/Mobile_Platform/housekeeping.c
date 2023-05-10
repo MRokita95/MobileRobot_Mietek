@@ -50,7 +50,7 @@ void HK_Init(Mobile_Platform_t* robot){
 
 void HK_Update(Mobile_Platform_t* robot){
 
-    if ((last_update - HAL_GetTick()) < HK_UPDATE){
+    if ((HAL_GetTick() - last_update) < HK_UPDATE){
         return;
     }
 
@@ -63,15 +63,15 @@ void HK_Update(Mobile_Platform_t* robot){
     uint32_t n_bytes = 0;
     if (new_pos.x_pos != robot_actual_pos.x_pos || new_pos.y_pos != robot_actual_pos.y_pos || new_status != robot_status || robot->actual_speed != 0)
     {
-        n_bytes +=  sprintf(&message[n_bytes], "ROB POS: %i [x], %i [y], %i [z], ORIENT: %f ACT SPEED: %i, ACT DIST: %u\r\n",  
+        n_bytes +=  sprintf(&message[n_bytes], "ROB POS: %i [x], %i [y], %i [z], ORIENT: %i ACT SPEED: %i, ACT DIST: %u\r\n",
                                                                                 new_pos.x_pos, 
                                                                                 new_pos.y_pos, 
                                                                                 new_pos.z_pos,
-                                                                                new_orient,
+                                                                                (int16_t)new_orient,
                                                                                 robot->actual_speed,
                                                                                 robot->current_distance);
 
-        n_bytes += sprintf(&message[n_bytes], "STATUS: %s", robot_status_to_msg(new_status));
+        n_bytes += sprintf(&message[n_bytes], "STATUS: %s\r\n", robot_status_to_msg(new_status));
 
         xQueueSend(xHKQueue, &message, portMAX_DELAY);
     }
@@ -106,6 +106,13 @@ void HK_Setpoints(void* setpoint, current_setpoint_t setpoint_type){
     	{
     		rob_coord_t setp = *(rob_coord_t*)setpoint;
     		sprintf(message, "MOVE TO POINT ON, setpoint: %i [x] %i [y] \r\n", setp.x_pos, setp.y_pos);
+    	}
+        break;
+
+    case ROTATE:
+    	{
+    		float setp = *(float*)setpoint;
+    		sprintf(message, "ROTATE, setpoint: %i [degrees] \r\n", (int16_t)setp);
     	}
         break;
     

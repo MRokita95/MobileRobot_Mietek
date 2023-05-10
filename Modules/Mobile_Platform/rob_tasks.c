@@ -9,8 +9,8 @@ extern Mobile_Platform_t robot;
 
 static command_t current_task;
 
-static bool is_ended(command_t* cmd){
-    return cmd->status != IN_PROGRESS ;
+static bool is_ready(command_t* cmd){
+    return cmd->status != IN_PROGRESS;
 }
 
 static void exec_type(command_t* cmd){
@@ -43,6 +43,11 @@ static void exec_type(command_t* cmd){
         Robot_MoveToPoint(&robot, cmd->speed, cmd->point.x_pos, cmd->point.y_pos);
         break;
 
+    case ROTATE:
+        ROB_DEBUG("ROTATE...\r\n");
+        Robot_Rotate(&robot, cmd->speed, cmd->angle);
+        break;
+
     case WAIT_TIME:
         ROB_DEBUG("WAIT ROB...\r\n");
         Robot_SetSpeed(&robot, 0);
@@ -50,6 +55,7 @@ static void exec_type(command_t* cmd){
         break;
     
     default:
+        ROB_DEBUG("UNDEFINED COMMAND...\r\n");
         break;
     }
 }
@@ -59,14 +65,14 @@ bool Execute_Command(){
 
     command_t* rob_task = &current_task;
 
-    if (!is_ended(&current_task) || Robot_Status(&robot) == ROB_IN_PROGRESS){
+    if (!is_ready(rob_task) || Robot_Status(&robot) == ROB_IN_PROGRESS){
         return false;
     }
 
     command_t cmd;
     command_buff_status_t buff_status = command_get_next(&cmd);
 
-    if (buff_status == BUFF_EMPTY){
+    if (buff_status == BUFF_EMPTY || cmd.status == EMPTY){
         return false;
     }
 
@@ -81,4 +87,5 @@ void End_Command_Execution(command_status_t status){
     command_t* rob_task = &current_task;
 
     rob_task->status = status;
+    command_set_status(status);
 }
