@@ -59,16 +59,35 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define GPIO_USER_BUTTON_Pin GPIO_PIN_13
+#define GPIO_USER_BUTTON_GPIO_Port GPIOC
+#define GPIO_USER_BUTTON_EXTI_IRQn EXTI15_10_IRQn
 #define ADC1_IN0_DISTANCE_Pin GPIO_PIN_0
 #define ADC1_IN0_DISTANCE_GPIO_Port GPIOA
+#define TIM2_PWM_CH2_Pin GPIO_PIN_1
+#define TIM2_PWM_CH2_GPIO_Port GPIOA
 #define TIM2_PWM_CH1_Pin GPIO_PIN_5
 #define TIM2_PWM_CH1_GPIO_Port GPIOA
+#define TIM3_ENCODER_CH1_Pin GPIO_PIN_6
+#define TIM3_ENCODER_CH1_GPIO_Port GPIOA
+#define TIM3_ENCODER_CH2_Pin GPIO_PIN_7
+#define TIM3_ENCODER_CH2_GPIO_Port GPIOA
 #define TIM2_PWM_CH4_Pin GPIO_PIN_2
 #define TIM2_PWM_CH4_GPIO_Port GPIOB
 #define TIM2_PWM_CH3_Pin GPIO_PIN_10
 #define TIM2_PWM_CH3_GPIO_Port GPIOB
-#define TIM2_PWM_CH2_Pin GPIO_PIN_3
-#define TIM2_PWM_CH2_GPIO_Port GPIOB
+#define TIM8_ENCODER_CH1_Pin GPIO_PIN_6
+#define TIM8_ENCODER_CH1_GPIO_Port GPIOC
+#define TIM8_ENCODER_CH2_Pin GPIO_PIN_7
+#define TIM8_ENCODER_CH2_GPIO_Port GPIOC
+#define GPIO_MOT1_DIR_Pin GPIO_PIN_8
+#define GPIO_MOT1_DIR_GPIO_Port GPIOA
+#define GPIO_MOT2_DIR_Pin GPIO_PIN_9
+#define GPIO_MOT2_DIR_GPIO_Port GPIOA
+#define GPIO_MOT3_DIR_Pin GPIO_PIN_10
+#define GPIO_MOT3_DIR_GPIO_Port GPIOC
+#define GPIO_MOT4_DIR_Pin GPIO_PIN_11
+#define GPIO_MOT4_DIR_GPIO_Port GPIOC
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

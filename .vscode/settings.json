@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "sensors_common.h": "c",
+        "icm20600.h": "c",
+        "i2c_utils.h": "c",
+        "pid.h": "c",
+        "pid_handle.h": "c",
+        "cmsis_os.h": "c",
+        "stdbool.h": "c",
+        "mobile_platform.h": "c",
+        "commands.h": "c"
+    }
+}
