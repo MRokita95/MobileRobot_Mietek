@@ -21,8 +21,18 @@ static void exec_type(command_t* cmd){
         ROB_DEBUG("START ROB...\r\n");
         break;
 
+    case AUTOPATH_START:
+        ROB_DEBUG("AUTO ROB CMD...\r\n");
+        Robot_SetMode(&robot, AUTONOMOUS_MODE);
+        break;
+
+    case MANUAL_START:
+        ROB_DEBUG("MANU ROB CMD...\r\n");
+        Robot_SetMode(&robot, MANUAL_MODE);
+        break;
+
     case STOP_ROB:
-        ROB_DEBUG("STOP ROB CMD...\r\n");
+        ROB_DEBUG("STOP/MANU/AUTO ROB CMD...\r\n");
         Robot_Stop(&robot);
         break;
 

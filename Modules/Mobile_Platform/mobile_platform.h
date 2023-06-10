@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "commands.h"
+#include "sensors_common.h"
+
+/**
+ * @brief Protected functions, definitions and typedefs
+ * 
+ */
 
 #define WHEEL_DIAMATER 65.f //[mm] 
 #define PI 3.14f
@@ -11,6 +17,8 @@
 
 #define ALIGN_SPEED 60
 #define RAMP_DIST 20 //mm before setpoint distance
+
+#define MANUAL_SPEED 150 // [mm/s]
 
 typedef struct {
     bool mode_on;
@@ -51,12 +59,33 @@ void HK_Update(Mobile_Platform_t* robot);
 
 void HK_Setpoints(void* setpoint, current_setpoint_t setpoint_type);
 
-float Robot_GetOrient(Mobile_Platform_t* robot);
-
-void Robot_Rotate(Mobile_Platform_t* robot, int32_t speed, int16_t angle_setpoint);
-
 bool Execute_Command();
 
 void End_Command_Execution(command_status_t status);
+
+
+euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot);
+
+void Robot_Rotate(Mobile_Platform_t* robot, int32_t speed, int16_t angle_setpoint);
+
+void Robot_SetSpeed(Mobile_Platform_t* robot, int32_t speed);
+
+void Robot_SetDistance(Mobile_Platform_t* robot, float distance);
+
+void Robot_MoveToPoint(Mobile_Platform_t* robot, int32_t speed, int32_t x_pos, int32_t y_pos);
+
+void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms);
+
+void Robot_Stop(Mobile_Platform_t* robot);
+
+void Robot_SetMode(Mobile_Platform_t* robot, robot_mode_t mode);
+
+void Robot_ManualCtrl(Mobile_Platform_t* robot, manual_ctrl_command_t ctrl);
+
+robot_status_t Robot_Status(Mobile_Platform_t* robot);
+
+robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot);
+
+rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot);
 
 #endif

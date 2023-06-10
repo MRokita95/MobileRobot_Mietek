@@ -26,6 +26,7 @@
 #include "imu_handle.h"
 #include "robot_app.h"
 #include "comm.h"
+#include "sensors_common.h"
 
 /* USER CODE END Includes */
 
@@ -104,11 +105,13 @@ void Robot_Application1(void);
 void vTask_Robot(void const * argument);
 void vTask_Application(void const * argument);
 void vTask_Communication(void const * argument);
+void vTask_Sensors(void const * argument);
 #define TASK_NUMBERS 5u
 
 #define ROBOT_TASK 1u
 #define ROBOT_APP 2u
 #define COMM_TASK 3u
+#define SENSOR_TASK 4u
 
 static Task_t Tasks[TASK_NUMBERS] =
 {
@@ -130,6 +133,13 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.task_name = "Comm Task",
 				.task_active = 1,
 				.task_function = vTask_Communication,
+				.priority = osPriorityNormal + 1
+		},
+
+    [SENSOR_TASK] = {
+				.task_name = "Sensors Task",
+				.task_active = 1,
+				.task_function = vTask_Sensors,
 				.priority = osPriorityNormal + 1
 		}
 };
@@ -745,16 +755,34 @@ void vTask_Communication(void const * argument){
     }
 }
 
-#define MAIN_TASK_FREQUENCY 100U
+#define SENSOR_TASK_FREQUENCY 100U
+void vTask_Sensors(void const * argument) {
+
+    Sensor_Init();
+      
+
+    TickType_t xNextWakeTime;
+
+    const TickType_t xBlockTime = SENSOR_TASK_FREQUENCY/portTICK_RATE_MS;
+    xNextWakeTime = xTaskGetTickCount();
+
+    for(;;){
+
+      vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+
+      Sensor_Task();
+  }
+}
+
+#define ROB_TASK_FREQUENCY 100U
 
 void vTask_Robot(void const * argument){
 
-  char *message = &message_buffer[0];
   Robot_Init(&robot);
 
   TickType_t xNextWakeTime;
 
-  const TickType_t xBlockTime = MAIN_TASK_FREQUENCY/portTICK_RATE_MS;
+  const TickType_t xBlockTime = ROB_TASK_FREQUENCY/portTICK_RATE_MS;
   xNextWakeTime = xTaskGetTickCount();
 
   for(;;){
@@ -788,10 +816,13 @@ void Robot_Application1()
 	ROBOT_WAIT(2000);
 	ROBOT_MOVE_DISTANCE(100, 300);
 	ROBOT_WAIT(2000);
+	ROBOT_MOVE_SPEED(200, 1000);
+	ROBOT_WAIT(2000);
 	ROBOT_MOVE_TO_POINT(200, 100, 0);
 	ROBOT_WAIT(2000);
 	ROBOT_ROTATE(75, 90);
 	ROBOT_WAIT(2000);
+
 	//ROBOT_MOVE_DISTANCE(100, 300);
 	//ROBOT_WAIT(2000);
 	//ROBOT_MOVE_TO_POINT(200, 400, 400);

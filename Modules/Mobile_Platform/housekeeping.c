@@ -5,6 +5,7 @@
 #include "mobile_platform.h"
 #include "FreeRTOS.h"
 #include "queue.h"
+#include "sensors_common.h"
 
 
 //queue definition
@@ -58,16 +59,18 @@ void HK_Update(Mobile_Platform_t* robot){
 
     rob_coord_t new_pos = Robot_GetCoord(robot);
     robot_status_t new_status = Robot_Status(robot);
-    float new_orient = Robot_GetOrient(robot);
+    euler_angles_t new_orient = Robot_GetOrient(robot);
 
     uint32_t n_bytes = 0;
     if (new_pos.x_pos != robot_actual_pos.x_pos || new_pos.y_pos != robot_actual_pos.y_pos || new_status != robot_status || robot->actual_speed != 0)
     {
-        n_bytes +=  sprintf(&message[n_bytes], "ROB POS: %i [x], %i [y], %i [z], ORIENT: %i ACT SPEED: %i, ACT DIST: %u\r\n",
+        n_bytes +=  sprintf(&message[n_bytes], "ROB POS: %i [x], %i [y], %i [z], ORIENT: %i [x] %i [y] %i [z], ACT SPEED: %i, ACT DIST: %u\r\n",
                                                                                 new_pos.x_pos, 
                                                                                 new_pos.y_pos, 
                                                                                 new_pos.z_pos,
-                                                                                (int16_t)new_orient,
+                                                                                (int16_t)new_orient.roll,
+                                                                                (int16_t)new_orient.pitch,
+                                                                                (int16_t)new_orient.yaw,
                                                                                 robot->actual_speed,
                                                                                 robot->current_distance);
 
