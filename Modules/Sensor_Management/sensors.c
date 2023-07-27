@@ -48,6 +48,7 @@ static bool orient_change_detection(const euler_angles_t* new_orient){
 
 void Sensor_Init(){
     
+	orient_access_sem = xSemaphoreCreateMutex();
     imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
 
     bool cal_status = IMU_GyroCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
@@ -58,7 +59,13 @@ void Sensor_Init(){
         SENS_DEBUG("Gyro NOT calibrated \r\n");
     }
 
-    orient_access_sem = xSemaphoreCreateMutex();
+    cal_status = IMU_MagnCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
+
+    if (cal_status == IMU_OK) {
+        SENS_DEBUG("Calibrated OK \r\n");
+    } else {
+        SENS_DEBUG("Gyro NOT calibrated \r\n");
+    }
 }
 
 void Sensor_Task(){

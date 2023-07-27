@@ -31,7 +31,7 @@ static uint32_t GetSector(uint32_t address){
     }
 }
 
-uint32_t Flash_Write(uint32_t StartAddress, uint8_t *txData, uint16_t size){
+uint32_t Flash_Write(uint32_t StartAddress, uint32_t *txData, uint16_t size){
 
     static FLASH_EraseInitTypeDef EraseInitStruct;
 	uint32_t SectorError;
@@ -49,29 +49,41 @@ uint32_t Flash_Write(uint32_t StartAddress, uint8_t *txData, uint16_t size){
 
     /* Fill EraseInit structure*/
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-    EraseInitStruct.Banks = FLASH_BANK_1;
+    //EraseInitStruct.Banks = FLASH_BANK_1;
     EraseInitStruct.Sector = StartSector;
     EraseInitStruct.NbSectors = (EndSector - StartSector) + 1u;
-    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_4;
+    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
 
-    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK)
-    {
-        /*Error occurred while page erase.*/
-        return HAL_FLASH_GetError ();
-    }
+
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPERR);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_WRPERR);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_PGAERR);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_PGPERR);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_PGSERR);
+
+
+	if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK)
+	{
+		/*Error occurred while page erase.*/
+		HAL_FLASH_Lock();
+		return HAL_FLASH_GetError ();
+	}
+
 
     /* Program the user Flash area word by word*/
 
     while (left<size)
     {
-        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, program_address, txData[left]) == HAL_OK)
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, program_address, txData[left]) == HAL_OK)
         {
-            program_address++;  // use StartAddress += 2 for half word and 8 for double word
+            program_address += 4u;  // use StartAddress += 2 for half word and 8 for double word
             left++;
         }
         else
         {
         /* Error occurred while writing data in Flash memory*/
+        	HAL_FLASH_Lock();
             return HAL_FLASH_GetError ();
         }
     }
@@ -84,12 +96,12 @@ uint32_t Flash_Write(uint32_t StartAddress, uint8_t *txData, uint16_t size){
 }
 
 
-void Flash_Read_Data (uint32_t StartAddress, uint8_t *rxData, uint16_t size)
+void Flash_Read(uint32_t StartAddress, uint32_t *rxData, uint16_t size)
 {
 	while (1)
 	{
 		*rxData = *(volatile uint32_t *)StartAddress;
-		StartAddress++;
+		StartAddress += 4u;
 		rxData++;
 		if (!(size--)) break;
 	}

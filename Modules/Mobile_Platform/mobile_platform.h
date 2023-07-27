@@ -20,6 +20,8 @@
 
 #define MANUAL_SPEED 150 // [mm/s]
 
+#define MINIMAL_SPEED 5 // [mm/s]
+
 typedef struct {
     bool mode_on;
     bool preset;
@@ -51,6 +53,14 @@ typedef enum{
     DISTANCE,
     POINT,
 } current_setpoint_t;
+
+
+typedef enum{
+    STOP = 0,
+    ACCEL,
+    MOVEMENT,
+    BRAKE
+} movement_phase_t;
 
 
 void HK_Init(Mobile_Platform_t* robot);

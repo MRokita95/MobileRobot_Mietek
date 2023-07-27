@@ -54,7 +54,7 @@ void IMU_Destroy(IMU_Handle_t imuInstance);
 
 IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance, uint32_t measures);
 
-IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance);
+IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance, uint32_t measures);
 
 IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t imuInstance);
 

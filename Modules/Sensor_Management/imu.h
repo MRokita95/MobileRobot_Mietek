@@ -37,6 +37,7 @@ typedef struct {
 	int32_t samples;
 	uint32_t timeout;
 	int32_t offset[3];
+	float scale[3];
 	bool calibrated;
 } magn_calibration_t;
 

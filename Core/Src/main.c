@@ -27,6 +27,7 @@
 #include "robot_app.h"
 #include "comm.h"
 #include "sensors_common.h"
+#include "param_handle.h"
 
 /* USER CODE END Includes */
 
@@ -108,10 +109,10 @@ void vTask_Communication(void const * argument);
 void vTask_Sensors(void const * argument);
 #define TASK_NUMBERS 5u
 
-#define ROBOT_TASK 1u
-#define ROBOT_APP 2u
-#define COMM_TASK 3u
-#define SENSOR_TASK 4u
+#define ROBOT_TASK 4u
+#define ROBOT_APP 3u
+#define COMM_TASK 1u
+#define SENSOR_TASK 2u
 
 static Task_t Tasks[TASK_NUMBERS] =
 {
@@ -210,6 +211,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim10);
 
+
+  //Param_Initialize();
+
   /*imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
 
 
@@ -264,7 +268,7 @@ int main(void)
 
         BaseType_t TASK_OK = xTaskCreate(Tasks[task_idx].task_function,
           Tasks[task_idx].task_name,
-          configMINIMAL_STACK_SIZE+100,
+          configMINIMAL_STACK_SIZE+125,
           ( void * ) NULL,
           Tasks[task_idx].priority,
           NULL );
@@ -272,6 +276,8 @@ int main(void)
         assert_param(pdPASS == TASK_OK);
       }
   }
+
+  Comm_Init();
 
   /* USER CODE END RTOS_THREADS */
 
@@ -747,9 +753,18 @@ void vTask_Application(void const * argument){
 
 }
 
+#define COMM_TASK_FREQUENCY 500U
 void vTask_Communication(void const * argument){
 
+
+	TickType_t xNextWakeTime;
+
+	const TickType_t xBlockTime = COMM_TASK_FREQUENCY/portTICK_RATE_MS;
+	xNextWakeTime = xTaskGetTickCount();
+
     for(;;){
+
+    	vTaskDelayUntil( &xNextWakeTime, xBlockTime );
       
         Comm_Task();
     }
@@ -813,36 +828,21 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, Stack
 
 void Robot_Application1()
 {
-	ROBOT_WAIT(2000);
-	ROBOT_MOVE_DISTANCE(100, 300);
-	ROBOT_WAIT(2000);
-	ROBOT_MOVE_SPEED(200, 1000);
-	ROBOT_WAIT(2000);
-	ROBOT_MOVE_TO_POINT(200, 100, 0);
-	ROBOT_WAIT(2000);
-	ROBOT_ROTATE(75, 90);
-	ROBOT_WAIT(2000);
-
-	//ROBOT_MOVE_DISTANCE(100, 300);
+	static int i = 0;
+	if (i == 0){
+		ROBOT_WAIT(2000);
+		ROBOT_MOVE_TO_POINT(200, 800, 800);
+		ROBOT_WAIT(2000);
+		i = 1;
+	}
+	//ROBOT_MOVE_TO_POINT(200, 200, 100);
 	//ROBOT_WAIT(2000);
-	//ROBOT_MOVE_TO_POINT(200, 400, 400);
 
+}
 
-    //ROBOT_MOVE_SPEED(100, 1000);
-    //ROBOT_WAIT(2000);
-    //ROBOT_MOVE_SPEED(-100, 1000);
-    //ROBOT_WAIT(2000);
-    //ROBOT_MOVE_DISTANCE(100, 300);
-	//ROBOT_WAIT(2000);
-	//ROBOT_WAIT(2000);
-	//ROBOT_ROTATE(100, 90);
-
-    //ROBOT_MOVE_TO_POINT(80, 50, 50);
-
-
-    //ROBOT_WAIT(2000);
-    //ROBOT_WAIT(5000);
-    //ROBOT_MOVE_SPEED(-100, 1000);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) 
+{
+	Comm_Uart_Receive_Irq();
 }
 
 // EXTI Line13 External Interrupt ISR Handler CallBackFun

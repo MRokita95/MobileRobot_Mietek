@@ -11,6 +11,7 @@
 #include "stm32f4xx_hal.h"
 #include "sensors_common.h"
 
+#define MAGNETIC_DECLINATION 6.33f
 
 typedef struct {
 	int16_t acc[3];
