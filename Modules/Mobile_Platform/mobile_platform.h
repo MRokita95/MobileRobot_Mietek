@@ -16,7 +16,7 @@
 #define MOBILE_PLATFORM_WIDTH 168.f //MAX is 180 mm
 
 #define ALIGN_SPEED 60
-#define RAMP_DIST 20 //mm before setpoint distance
+#define RAMP_DIST 0 //mm before setpoint distance
 
 #define MANUAL_SPEED 150 // [mm/s]
 
