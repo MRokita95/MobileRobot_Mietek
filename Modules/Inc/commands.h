@@ -73,5 +73,7 @@ command_status_t command_actual_status(void);
 void command_set_status(command_status_t status);
 
 
+void Management_Task(void);
+
 
 #endif

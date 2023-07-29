@@ -41,15 +41,6 @@ QueueHandle_t xRespQueue;
 
 
 
-/**
- * @brief communication task frame buffer
- * 
- * @note size is the same as RX_BUFFER_SIZE
- * no need for bigger, as we read full buffer at once
- * 
- */
-static comm_task_frame_t m_comm_buffer;
-static SemaphoreHandle_t comm_buff_access;
 
 /**
  * @brief Receiving buffer and data pointer
@@ -67,86 +58,25 @@ static uint8_t rx_data[MAX_UART_MSG_SIZE];
  */
 void Comm_Uart_Receive_Irq(){
 
-    rx_write_pointer++;
-    HAL_UART_Receive_IT(&huart2, rx_data, (uint16_t)MAX_UART_MSG_SIZE);
-    
+    comm_task_frame_t m_comm_buffer;
+    BaseType_t xHigherPriorityWoken = pdFALSE;
 
-}
+    memcpy(&m_comm_buffer.appdata, rx_data, sizeof(appdata_t));
 
-
-
-static void retreive_uart_data(){
-    /*disable UART-based interrupts when we modify rx_write_pointer and read rx_buffer */
-    HAL_NVIC_DisableIRQ(USART2_IRQn);
-
-    int32_t packets_cnt = rx_write_pointer;
-
-    if (packets_cnt <= 0){
-        HAL_NVIC_EnableIRQ(USART2_IRQn);
-        return;
-    }
-
-    uint16_t next_comm_buff_idx = 0u;
-
-    
-    
-
-    //mutex take
-    if( xSemaphoreTake(comm_buff_access, 5) == pdPASS){
-
-
-        
-        //TODO: check if application_id could stand here (one or two)
-        memcpy(&m_comm_buffer.appdata, rx_data[MAX_UART_MSG_SIZE], sizeof(appdata_t));
+    /* only verified data could be queued */
+    if ((m_comm_buffer.appdata.application_id != 0u) && (m_comm_buffer.appdata.function_id != 0u)){
         memcpy(&m_comm_buffer.data_valid, &rx_data[MAX_UART_MSG_SIZE-1], 1);
-
         m_comm_buffer.header = PACKET_HEADER_UNREAD;
 
-        rx_write_pointer--;
-
-        xQueueSend(xCommQueue, &m_comm_buffer, 5u);
-
-        //mutex return
-        xSemaphoreGive(comm_buff_access);
-
-
+        xQueueSendFromISR(xCommQueue, &m_comm_buffer, &xHigherPriorityWoken);
     }
-
-
-    HAL_NVIC_EnableIRQ(USART2_IRQn);
-}
-
-
-void Comm_RetreiveBuffer(comm_task_frame_t* comm_data, uint16_t* size){
-
-    if(comm_data == NULL || size == NULL){
-        return;
-    }
-
-    *size = 0;
-    if( xSemaphoreTake(comm_buff_access, 5) == pdPASS){
-        
-        comm_task_frame_t* packet = &m_comm_buffer;  //start always from the begining
-
-        while(packet->header == PACKET_HEADER_UNREAD){
-            memcpy(&comm_data[*size], packet, sizeof(comm_task_frame_t));
-            packet->header = PACKET_HEADER_READ;
-
-            packet++;
-            *size++;
-        }
-
-        xSemaphoreGive(comm_buff_access);
-    }
+    
+    /* set next interrupt service routing*/
+    HAL_UART_Receive_IT(&huart2, rx_data, (uint16_t)MAX_UART_MSG_SIZE);
 }
 
 
 void Comm_Init(){
-    rx_write_pointer = -1;
-    
-	comm_buff_access = xSemaphoreCreateMutex();
-
-	configASSERT(comm_buff_access);
 
     xCommQueue = xQueueCreateStatic(COMM_QUEUE_LENGTH, COMM_FRAME_SIZE, queue_buffer, &xStaticQueue);
     configASSERT(xCommQueue);
@@ -182,7 +112,5 @@ void Comm_Task(){
         send_uart(&huart2, &task_response.task_failed);
         send_uart(&huart2, &task_response.function_failed);
     } 
-
-    retreive_uart_data();
 }
 

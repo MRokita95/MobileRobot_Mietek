@@ -133,8 +133,9 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
     case ROB_APP_ID:
     {
         command_type_t cmd_type = task->appdata.function_id;
+        uint8_t* parameters = &task->appdata.parameters;  //TODO
         command_t rob_cmd;
-        bool cmd_ok = deserialize_rob_command(cmd_type, &rob_cmd, &task->appdata.parameters);
+        bool cmd_ok = deserialize_rob_command(cmd_type, &rob_cmd, parameters);
         if (cmd_ok){
             command_buff_status_t buff_status = command_add(rob_cmd);
 
@@ -231,13 +232,14 @@ void Management_Task(){
     //uint16_t size=0u;
     //Comm_RetreiveBuffer(&task_buff[0], &size);
 
+    //UBaseType_t cnt = uxQueueMessagesWaiting(xCommQueue);
+
      /* HouseKeeping data to send */
     if(xQueueReceive(xCommQueue, &task_buff, 10u) == pdTRUE) {
 
         for (uint16_t idx = 0; idx < COMM_FRAME_BUFF_SIZE; idx++){
-            if (task_buff[idx].header == PACKET_HEADER_UNREAD){
 
-                
+            if (task_buff[idx].header == PACKET_HEADER_UNREAD){
 
                 if (send_for_execution(&task_buff[idx]) != OK){
 
