@@ -46,6 +46,9 @@ IMU_Handle_t IMU_Initialize(uint8_t i2c_addr, I2C_HandleTypeDef* i2c_inst)
 	IMU_ReturnCode_t driver_status = (IMU_ReturnCode_t) imuInstance->icm.driver.status;
 	imuInstance->icm.driver.status = HAL_OK;
 
+	//for now there is only one filter, therefore could be hardcoded
+	imuInstance->filter_callback = ComplementaryFilter;
+
 	return imuInstance;
 
 }
@@ -136,8 +139,6 @@ euler_angles_t IMU_CalcEuler(IMU_Handle_t imuInstance)
 	//get magnetometer data
 	IMU_GetMagn(imuInstance);
 
-	//should be done in seperate function or in main.c
-	imuInstance->filter_callback = ComplementaryFilter;
 
 	int16_t gyro_calibrated[3];
 	gyro_calibrated[x] = imuInstance->icm.speed[x] - imuInstance->icm.calibration.offset[x];
