@@ -22,44 +22,16 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "robot.h"
-#include "imu_handle.h"
-#include "robot_app.h"
-#include "comm.h"
-#include "sensors_common.h"
-#include "param_handle.h"
-
+#include "task_workers.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef struct
-{
-	const char *timer_name;
-	uint32_t period_ms;
-	UBaseType_t auto_reload;
-	uint8_t ID;
-	TimerCallbackFunction_t timer_handle;
-	StaticTimer_t buffer;
-} Timer_t;
-
-
-typedef struct
-{
-	char *task_name;
-	uint8_t task_active;
-	osSemaphoreId activ_semaphore;
-	TaskFunction_t task_function;
-	UBaseType_t priority;
-} Task_t;
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define CALIB_CNT     100u
-
-#define MESSAGE_LENGTH 120u
 
 /* USER CODE END PD */
 
@@ -82,68 +54,8 @@ UART_HandleTypeDef huart2;
 
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
-char message_buffer[MESSAGE_LENGTH];
 
 
-#define TIMER_NUMBERS 2u
-#define EULER_TIMER 0u
-BaseType_t TIMER_OK;
-void Timer_Task_calc(TimerHandle_t xTimer);
-static Timer_t Timers[TIMER_NUMBERS] =
-{
-		[EULER_TIMER] = {
-				.timer_name = "IMU Euler angles calc",
-				.period_ms = 10,
-				.auto_reload = 1u,
-				.ID = 1u,
-				.timer_handle = Timer_Task_calc,
-				.buffer = {0}
-		}
-};
-/* USER CODE BEGIN PV */
-void Robot_Application1(void);
-
-void vTask_Robot(void const * argument);
-void vTask_Application(void const * argument);
-void vTask_Communication(void const * argument);
-void vTask_Sensors(void const * argument);
-#define TASK_NUMBERS 5u
-
-#define ROBOT_TASK 4u
-#define ROBOT_APP 3u
-#define COMM_TASK 1u
-#define SENSOR_TASK 2u
-
-static Task_t Tasks[TASK_NUMBERS] =
-{
-		[ROBOT_TASK] = {
-				.task_name = "Robot Task",
-				.task_active = 1,
-				.task_function = vTask_Robot,
-				.priority = osPriorityNormal + 2
-		},
-
-    [ROBOT_APP] = {
-				.task_name = "Robot Task",
-				.task_active = 0,
-				.task_function = vTask_Application,
-				.priority = osPriorityNormal + 1
-		},
-
-    [COMM_TASK] = {
-				.task_name = "Comm Task",
-				.task_active = 1,
-				.task_function = vTask_Communication,
-				.priority = osPriorityNormal + 1
-		},
-
-    [SENSOR_TASK] = {
-				.task_name = "Sensors Task",
-				.task_active = 1,
-				.task_function = vTask_Sensors,
-				.priority = osPriorityNormal + 1
-		}
-};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -166,10 +78,6 @@ void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-IMU_Handle_t imu_sensor = NULL;
-IMU_ReturnCode_t calibration_status;
-
-Mobile_Platform_t robot;
 
 /* USER CODE END 0 */
 
@@ -212,20 +120,6 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim10);
 
 
-  //Param_Initialize();
-
-  /*imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
-
-
-    calibration_status = IMU_GyroCalibration(imu_sensor, CALIB_CNT);
-
-    if (calibration_status == IMU_OK) {
-      send_uart(&huart2, "Calibrated OK \r\n");
-    } else {
-      send_uart(&huart2, "Gyro NOT calibrated \r\n");
-    }
-    */
-
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -239,14 +133,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /*
-   * TimerHandle_t xTimerHandle = xTimerCreateStatic(	Timers[EULER_TIMER].timer_name,
-									Timers[EULER_TIMER].period_ms / portTICK_PERIOD_MS,
-									Timers[EULER_TIMER].auto_reload,
-									NULL,
-									Timers[EULER_TIMER].timer_handle,
-									&Timers[EULER_TIMER].buffer);
-	assert_param(xTimerHandle != NULL);
-	xTimerStart(xTimerHandle, 0);
+
 	*/
   /* USER CODE END RTOS_TIMERS */
 
@@ -262,22 +149,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
 
-  for (uint8_t task_idx = 0; task_idx < TASK_NUMBERS; task_idx ++){
-
-      if (Tasks[task_idx].task_active != 0) {
-
-        BaseType_t TASK_OK = xTaskCreate(Tasks[task_idx].task_function,
-          Tasks[task_idx].task_name,
-          configMINIMAL_STACK_SIZE+125,
-          ( void * ) NULL,
-          Tasks[task_idx].priority,
-          NULL );
-
-        assert_param(pdPASS == TASK_OK);
-      }
-  }
-
-  Comm_Init();
+  TasksWorkers_Init();
 
   /* USER CODE END RTOS_THREADS */
 
@@ -714,103 +586,6 @@ void send_uart(UART_HandleTypeDef* uart_instance, void const * argument)
 	HAL_UART_Transmit(uart_instance, (uint8_t *)str, strlen(str), 100);
 }
 
-void Timer_Task_calc(TimerHandle_t xTimer)
-{
-	char *message = &message_buffer[0];
-
-	euler_angles_t orient = IMU_CalcEuler(imu_sensor);
-  static euler_angles_t prev_orient;
-
-	if (	(abs((int16_t)orient.roll - (int16_t)prev_orient.roll) >= 1u) ||
-			(abs((int16_t)orient.pitch - (int16_t)prev_orient.pitch) >= 1u) ||
-			(abs((int32_t)orient.yaw - (int32_t)prev_orient.yaw) >= 1u)
-		) {
-
-
-
-		sprintf(message_buffer, "Actual orient estimate: %i , %i , %i \r\n", 	(int16_t)orient.roll,
-																		(int16_t)orient.pitch,
-																		(int32_t)orient.yaw);
-
-    send_uart(&huart2, message);
-
-
-	}
-
-  prev_orient = orient;
-
-
-}
-
-void vTask_Application(void const * argument){
-
-	
-  for(;;){
-    
-
-    }
-
-
-}
-
-#define COMM_TASK_FREQUENCY 500U
-void vTask_Communication(void const * argument){
-
-
-	TickType_t xNextWakeTime;
-
-	const TickType_t xBlockTime = COMM_TASK_FREQUENCY/portTICK_RATE_MS;
-	xNextWakeTime = xTaskGetTickCount();
-
-    for(;;){
-
-    	vTaskDelayUntil( &xNextWakeTime, xBlockTime );
-      
-        Comm_Task();
-    }
-}
-
-#define SENSOR_TASK_FREQUENCY 100U
-void vTask_Sensors(void const * argument) {
-
-    Sensor_Init();
-      
-
-    TickType_t xNextWakeTime;
-
-    const TickType_t xBlockTime = SENSOR_TASK_FREQUENCY/portTICK_RATE_MS;
-    xNextWakeTime = xTaskGetTickCount();
-
-    for(;;){
-
-      vTaskDelayUntil( &xNextWakeTime, xBlockTime );
-
-      Sensor_Task();
-  }
-}
-
-#define ROB_TASK_FREQUENCY 100U
-
-void vTask_Robot(void const * argument){
-
-  Robot_Init(&robot);
-
-  TickType_t xNextWakeTime;
-
-  const TickType_t xBlockTime = ROB_TASK_FREQUENCY/portTICK_RATE_MS;
-  xNextWakeTime = xTaskGetTickCount();
-
-  for(;;){
-
-	vTaskDelayUntil( &xNextWakeTime, xBlockTime );
-
-	Robot_UpdateMotionStatus(&robot);
-
-	Robot_Task(&robot);
-
-  }
-}
-
 
 #ifdef configUSE_TIMERS && configSUPPORT_STATIC_ALLOCATION
 void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
@@ -826,19 +601,6 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, Stack
 #endif
 
 
-void Robot_Application1()
-{
-	static int i = 0;
-	if (i == 0){
-		ROBOT_WAIT(2000);
-		ROBOT_MOVE_TO_POINT(200, 800, 800);
-		ROBOT_WAIT(2000);
-		i = 1;
-	}
-	//ROBOT_MOVE_TO_POINT(200, 200, 100);
-	//ROBOT_WAIT(2000);
-
-}
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) 
 {
