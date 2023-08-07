@@ -4,6 +4,7 @@
 #include "sensors_common.h"
 #include "stm32f4xx_hal.h"
 
+#define IMU_GYRO_CALIB_CNT 				100u
 
 #define ICM20600_I2C_ADDR1              0x68
 #define ICM20600_I2C_ADDR2              0x69
@@ -53,7 +54,7 @@ void IMU_Destroy(IMU_Handle_t imuInstance);
 
 IMU_ReturnCode_t IMU_GyroCalibration(IMU_Handle_t imuInstance, uint32_t measures);
 
-IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance);
+IMU_ReturnCode_t IMU_MagnCalibration(IMU_Handle_t imuInstance, uint32_t measures);
 
 IMU_ReturnCode_t IMU_GetAcceleration(IMU_Handle_t imuInstance);
 

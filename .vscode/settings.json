@@ -8,6 +8,11 @@
         "cmsis_os.h": "c",
         "stdbool.h": "c",
         "mobile_platform.h": "c",
-        "commands.h": "c"
+        "commands.h": "c",
+        "imu_handle.h": "c",
+        "robot_app.h": "c",
+        "stm32f4xx_hal.h": "c",
+        "robot.h": "c",
+        "freertos.h": "c"
     }
 }

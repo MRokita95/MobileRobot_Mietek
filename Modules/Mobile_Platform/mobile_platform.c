@@ -4,6 +4,8 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 #include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #define BIND_CONST -2
 
@@ -16,6 +18,7 @@
 #define MM_S_SPEED(rpm_speed) (float)(rpm_speed) * PI * WHEEL_DIAMATER / SECOND_IN_MINUTE
 
 #define ROUND_FLOAT(value) (value < 0) ? (value - 0.5) : (value + 0.5)
+
 
 
 enum{
@@ -45,7 +48,7 @@ motor_handle_t motors[MOTORS_CNT] = {
             .KP = 0.06,
             .KI = 0.9,
             .KD = 0.4,
-            .integratorLimit = 60,
+            .integratorLimit = 100,
         },
     },
 
@@ -65,7 +68,7 @@ motor_handle_t motors[MOTORS_CNT] = {
             .KP = 0.06,
             .KI = 0.9,
             .KD = 0.4,
-            .integratorLimit = 60,
+            .integratorLimit = 100,
         },
     },
 
@@ -92,24 +95,36 @@ motor_handle_t motors[MOTORS_CNT] = {
     },
 };
 
-typedef struct{
+ struct robot_internal_state_t{
     robot_status_t status;
+    robot_mode_t mode;
+    robot_mode_t next_mode;
     uint32_t current_time;
     distance_mode_t distance;
     time_mode_t timer;
     rob_coord_t coordinares;
+    euler_angles_t imu_orient;
     rob_coord_t setpoint_coord;
     rob_angle_t orient;
+    movement_phase_t mov_phase;
     float single_wheel_speed[4];    /*0 - front right, 1 - front left, 2,3 - not used*/
     float actual_linear_speed;
+    float acc_setpoint;
     SemaphoreHandle_t activate_mode;
     SemaphoreHandle_t evaluate_status;
-} robot_internal_state_t;
+};
+
+static reference_motor_t ref_table[MOTORS_CNT];
 
 
-static robot_internal_state_t m_rob_state;
 
-static reference_motor_t ref_table[4];
+//private declarations
+static void set_rob_mode(Mobile_Platform_t* robot, robot_mode_t mode);
+static int32_t speed_profiler(Mobile_Platform_t* robot);
+static inline void clamp_orient(float* orient);
+static void set_rob_state(Mobile_Platform_t* robot, robot_status_t status);
+
+//TODO: add here another declarations
 
 static inline int32_t max_signed(int32_t v1, int32_t v2) {
 
@@ -124,30 +139,61 @@ static inline int32_t max_signed(int32_t v1, int32_t v2) {
 
 static void set_angle(Mobile_Platform_t* robot, int32_t speed, float angle){
     
-    m_rob_state.orient.mode_on = true;
-    m_rob_state.orient.setpoint = angle;
+    float tol = 1.f;
+    float ang_diff = robot->handle->orient.actual - angle;
 
-    if (m_rob_state.orient.setpoint < 0.f) {
-        m_rob_state.orient.setpoint += 360.f;
+    if (fabsf(ang_diff) <= tol) {
+        set_rob_state(robot, ROB_IDLE);
+        return;
     }
 
+    set_rob_mode(robot, ORIENT_MODE);
+    robot->handle->orient.mode_on = true;
+    robot->handle->orient.setpoint = angle;
+
+    // if (robot->handle->setpoint_coord.x_pos < 0 && robot->handle->setpoint_coord.y_pos < 0){
+    //     robot->handle->orient.setpoint -= 90.f;
+
+    // } else if (robot->handle->setpoint_coord.x_pos < 0 && robot->handle->setpoint_coord.y_pos > 0){
+    //     robot->handle->orient.setpoint += 90.f;
+    // }
+
+    clamp_orient(&robot->handle->orient.setpoint);
+
+    robot->handle->orient.clockwise_on = (robot->handle->orient.actual > robot->handle->orient.setpoint) ? true : false;
+
+
     int32_t speed_setpoint = 0;
-    if (m_rob_state.orient.setpoint > m_rob_state.orient.actual){
-        m_rob_state.orient.clockwise_on = true;
+    if (robot->handle->orient.clockwise_on){
         speed_setpoint = speed;
     } else {
         speed_setpoint = -speed;
     }
 
-    Robot_SetWheelSpeed(robot, speed_setpoint, -speed_setpoint);
+    Robot_SetWheelSpeed(robot, -speed_setpoint, speed_setpoint);
+
+    robot->handle->mov_phase = MOVEMENT;
+}
+
+static inline bool orient_reached(float actual, float setpoint, bool clockwise_on){
+
+    bool stop_cond = false;
+    float tol = 1.f;
+
+    if (clockwise_on){
+        stop_cond = ((actual - tol) <= setpoint) ? true : false;
+    } else {
+        stop_cond = ((actual + tol) >= setpoint) ? true : false;
+    }
+
+    return stop_cond;
 }
 
 static void eval_rob_state(Mobile_Platform_t* robot) {
 
 
-    if (m_rob_state.orient.mode_on){
-        if ((m_rob_state.orient.clockwise_on && (m_rob_state.orient.actual >= m_rob_state.orient.setpoint)) ||
-            (!m_rob_state.orient.clockwise_on && (m_rob_state.orient.actual <= m_rob_state.orient.setpoint)) ){
+    if (Robot_ActiveMode(robot) == ORIENT_MODE){
+        if (orient_reached(robot->handle->orient.actual, robot->handle->orient.setpoint, robot->handle->orient.clockwise_on)){
             
             //save current robot speed setpoint
             int32_t speed_setpoint = robot->speed_setpoint;
@@ -155,25 +201,20 @@ static void eval_rob_state(Mobile_Platform_t* robot) {
             Robot_Stop(robot);
 
             //Preset before movement to the point
-            if (m_rob_state.distance.preset){
-                int32_t distance = (int32_t)sqrt((m_rob_state.setpoint_coord.x_pos*m_rob_state.setpoint_coord.x_pos) +
-                                                    (m_rob_state.setpoint_coord.y_pos*m_rob_state.setpoint_coord.y_pos));
+            if (robot->handle->distance.preset){
+                float distance = (float)sqrt((robot->handle->setpoint_coord.x_pos*robot->handle->setpoint_coord.x_pos) +
+                                                    (robot->handle->setpoint_coord.y_pos*robot->handle->setpoint_coord.y_pos));
 
-                //TODO: fixme :(
-                if ((m_rob_state.setpoint_coord.x_pos < m_rob_state.coordinares.x_pos) ||
-                    (m_rob_state.setpoint_coord.y_pos < m_rob_state.coordinares.y_pos)) {
-                    distance = -distance;
-                }
 
                 Robot_SetSpeed(robot, speed_setpoint);
                 Robot_SetDistance(robot, distance);
 
-                m_rob_state.distance.preset = false;
+                robot->handle->distance.preset = false;
             } 
             //Otherway - End Command with proper status
             else {
                 Robot_Stop(robot);
-                End_Command_Execution(DONE_OK);
+                End_Command_Execution(robot, DONE_OK);
 
                 //TODO:
                 //End_Command_Execution(TIMEOUT);
@@ -183,40 +224,50 @@ static void eval_rob_state(Mobile_Platform_t* robot) {
     }
 
 
-    if (m_rob_state.distance.mode_on){
-        if (abs(m_rob_state.distance.actual_distance) >= abs(m_rob_state.distance.setpoint_distance)){
-            
-            m_rob_state.setpoint_coord.x_pos = 0;
-            m_rob_state.setpoint_coord.y_pos = 0;
+   if (Robot_ActiveMode(robot) == DISTANCE_MODE){
 
-            Robot_Stop(robot);
-            End_Command_Execution(DONE_OK);
+        int32_t next_speed_setpoint = speed_profiler(robot);
 
-            //TODO:
-            //End_Command_Execution(TIMEOUT);
-            //End_Command_Execution(ERR);
+        if (robot->handle->mov_phase == BRAKE){
+            Robot_SetSpeed(robot, next_speed_setpoint);
         } 
-        else if (abs(m_rob_state.distance.actual_distance) >= abs(m_rob_state.distance.ramp_distance) && 
-            (!m_rob_state.distance.slow_ramp_on) && (m_rob_state.distance.ramp_distance > 1.f)) {
-            
-            Robot_SetSpeed(robot, robot->speed_setpoint/2);
-            m_rob_state.distance.slow_ramp_on = true;
+        else if (robot->handle->mov_phase == STOP){
+            Robot_Stop(robot);
+            End_Command_Execution(robot, DONE_OK);
         }
     }
 
-    if (m_rob_state.timer.mode_on){
+    if (Robot_ActiveMode(robot) == TIMER_MODE){
         uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
-        if (dt - m_rob_state.timer.start_time >= m_rob_state.timer.stop_time){
+        if (dt - robot->handle->timer.start_time >= robot->handle->timer.stop_time){
             Robot_Stop(robot);
-            End_Command_Execution(DONE_OK);
+            End_Command_Execution(robot, DONE_OK);
 
             //TODO:
             //End_Command_Execution(ERR);
         }
     }
 
+    if (Robot_ActiveMode(robot) == MANUAL_MODE){
+        //for now nothing
+    }
+
+    if (Robot_ActiveMode(robot) == AUTONOMOUS_MODE){
+        //end mode here
+    }
 }
 
+static inline void clamp_orient(float* orient){
+
+    if (*orient >= 180.0){
+        float diff = 180.f - *orient;
+        *orient = -180.0 + diff;
+
+    } else if (*orient <= -180.0){
+        float diff = -180.f + *orient;
+        *orient =  180.0 - diff;
+    }
+}
 
 static void eval_motion_status(Mobile_Platform_t* robot) {
 
@@ -225,7 +276,7 @@ static void eval_motion_status(Mobile_Platform_t* robot) {
     float sum_speed = 0;
     int32_t encoders = 0;
 
-    uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS) - (m_rob_state.current_time);
+    uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS) - (robot->handle->current_time);
     float dt_s = (float)dt/1000.f;
 
     for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
@@ -234,7 +285,7 @@ static void eval_motion_status(Mobile_Platform_t* robot) {
         if (mot_handle->encoder_present){
             actual_linear_speed = MM_S_SPEED(mot_handle->encoder.act_speed);
 
-            m_rob_state.single_wheel_speed[idx] = actual_linear_speed;
+            robot->handle->single_wheel_speed[idx] = actual_linear_speed;
             sum_speed += actual_linear_speed;
             actual_dist += (actual_linear_speed * dt_s);
             encoders++;
@@ -244,71 +295,125 @@ static void eval_motion_status(Mobile_Platform_t* robot) {
     /* general mobile robot speed*/
     robot->actual_speed = (int32_t)(sum_speed / encoders);
 
-    /* detailed speed used for coordinates calculation */
-    /* TODO: ADD X Y Z CALCULATION BASED ON ACTUAL ANGLE !!!!!!! - coordinates must stay the same */
-    // if (!m_rob_state.distance.preset){
-    //     m_rob_state.coordinares.x_pos += (int32_t)(dt_s * (int32_t)(m_rob_state.single_wheel_speed[right]/2.f + m_rob_state.single_wheel_speed[left]/2.f));
-    //     m_rob_state.coordinares.y_pos += (int32_t)(dt_s * (int32_t)(m_rob_state.single_wheel_speed[right] - m_rob_state.single_wheel_speed[left]));
-    //     m_rob_state.coordinares.z_pos = 0; /*disabled until IMU integration*/
-    // }
 
-    if(m_rob_state.orient.mode_on){
-        float d_orient = RAD_TO_DEG((float)atan((abs(dt_s*m_rob_state.single_wheel_speed[right])+
-                                            abs(dt_s*m_rob_state.single_wheel_speed[left]))/
+    if(robot->handle->orient.mode_on){
+        float d_orient = RAD_TO_DEG((float)atan((abs(dt_s*robot->handle->single_wheel_speed[right])+
+                                            abs(dt_s*robot->handle->single_wheel_speed[left]))/
                                             MOBILE_PLATFORM_WIDTH/2));
-        if(m_rob_state.orient.clockwise_on){
-            m_rob_state.orient.actual += d_orient;
+        if(robot->handle->orient.clockwise_on){
+            robot->handle->orient.actual -= d_orient;
         } else {
-            m_rob_state.orient.actual -= d_orient;
+            robot->handle->orient.actual += d_orient;
         }
     }
 
     /*zero the orientation*/
-    if (m_rob_state.orient.actual >= 360.0){
-        m_rob_state.orient.actual -= 360.0;
-    }
+    clamp_orient(&robot->handle->orient.actual);
 
-    // m_rob_state.coordinares.x_pos -= (int32_t)((dt_s * (int32_t)((m_rob_state.single_wheel_speed[right] +
-    //                                     m_rob_state.single_wheel_speed[left])/2.f)) *
-    //                                     cos((double)DEG_TO_RAD(m_rob_state.orient.actual)));
-    // m_rob_state.coordinares.y_pos -= (int32_t)((dt_s * (int32_t)((m_rob_state.single_wheel_speed[right] +
-    //                                     m_rob_state.single_wheel_speed[left])/2.f))*
-    //                                     sin((double)DEG_TO_RAD(m_rob_state.orient.actual)));
+    //Magnetometer works but not calibrated correctly
+    //robot->handle->imu_orient.yaw = robot->handle->orient.actual;
 
-    int32_t dx = (int32_t)ROUND_FLOAT((actual_dist / encoders) * cos((double)DEG_TO_RAD((int16_t)m_rob_state.orient.actual)));
-    int32_t dy = (int32_t)ROUND_FLOAT((actual_dist / encoders) * sin((double)DEG_TO_RAD((int16_t)m_rob_state.orient.actual)));
+
+    int32_t dx = (int32_t)ROUND_FLOAT((actual_dist / (float)encoders) * cos((double)DEG_TO_RAD((int16_t)robot->handle->orient.actual)));
+    int32_t dy = (int32_t)ROUND_FLOAT((actual_dist / (float)encoders) * sin((double)DEG_TO_RAD((int16_t)robot->handle->orient.actual)));
     if (robot->speed_setpoint > 0)
     {
-        m_rob_state.coordinares.x_pos += dx;
-        m_rob_state.coordinares.y_pos += dy;
-        m_rob_state.coordinares.z_pos = 0; /*disabled until IMU integration*/
+        robot->handle->coordinares.x_pos += dx;
+        robot->handle->coordinares.y_pos += dy;
+        robot->handle->coordinares.z_pos = 0; /*disabled until IMU integration*/
     } 
     else if (robot->speed_setpoint < 0) {
-        m_rob_state.coordinares.x_pos += dx;
-        m_rob_state.coordinares.y_pos += dy;
-        m_rob_state.coordinares.z_pos = 0; /*disabled until IMU integration*/
+        robot->handle->coordinares.x_pos += dx;
+        robot->handle->coordinares.y_pos += dy;
+        robot->handle->coordinares.z_pos = 0; /*disabled until IMU integration*/
     }
 
     
-    m_rob_state.current_time += dt;
+    robot->handle->current_time += dt;
 
 
-    if (!m_rob_state.distance.mode_on){
+    if (!robot->handle->distance.mode_on){
         return;
     }
-    m_rob_state.distance.actual_distance = m_rob_state.distance.actual_distance + (actual_dist / encoders);
-    m_rob_state.distance.current_time += dt;
+    robot->handle->distance.actual_distance = robot->handle->distance.actual_distance + (actual_dist / encoders);
 
-    robot->current_distance =  m_rob_state.distance.actual_distance;
+    robot->current_distance =  robot->handle->distance.actual_distance;
+}
+
+static inline int32_t next_speed_setpoint(){
+    return 0;   //mock for now
+}
+
+/**
+ * @brief return next speed setpoint based on set accel and current distance from rob->handle
+ * 
+ * @param robot 
+ * @return int32_t 
+ */
+static int32_t speed_profiler(Mobile_Platform_t* robot){
+
+    const float tol = 1.0f;
+
+    int32_t speed_setp = robot->speed_setpoint;
+    int32_t next_speed = next_speed_setpoint();
+
+    float dist_left = robot->handle->distance.setpoint_distance - robot->handle->distance.actual_distance;
+    float braking_dist = (float)((robot->actual_speed - next_speed) * (robot->actual_speed + next_speed)) / (2.f * robot->handle->acc_setpoint);
+
+
+    if (robot->handle->mov_phase == BRAKE){
+
+        uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS) - robot->handle->distance.current_time;
+
+        float dt_s = (float)dt/1000.f;
+        if (abs(speed_setp) > abs(next_speed)){
+
+            speed_setp = speed_setp - (int32_t)((float)dt_s * robot->handle->acc_setpoint);
+
+            if (abs(speed_setp) <= abs(next_speed)){
+                speed_setp = next_speed;
+            }
+        }
+    }
+
+    if (robot->handle->mov_phase != BRAKE){
+
+        if (dist_left <= braking_dist){
+            robot->handle->mov_phase = BRAKE;
+        }
+    }
+
+    //additional check for safety - independent from mov_phase
+    if ((abs(robot->handle->distance.actual_distance) >= abs(robot->handle->distance.setpoint_distance + tol)) ||
+        ((robot->handle->mov_phase == BRAKE) && speed_setp == 0)
+    ){
+            
+        robot->handle->setpoint_coord.x_pos = 0;
+        robot->handle->setpoint_coord.y_pos = 0;
+        robot->handle->setpoint_coord.z_pos = 0;
+        robot->handle->mov_phase = STOP;
+        speed_setp = 0;
+    }
+
+    robot->handle->distance.current_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
+
+    return speed_setp;
 }
 
 
-static void set_rob_state(robot_status_t status){
-    if( xSemaphoreTake(m_rob_state.evaluate_status, 10) == pdPASS){
-        m_rob_state.status = status;
-        xSemaphoreGive(m_rob_state.evaluate_status);
+static void set_rob_state(Mobile_Platform_t* robot, robot_status_t status){
+    if( xSemaphoreTake(robot->handle->evaluate_status, 10) == pdPASS){
+        robot->handle->status = status;
+        xSemaphoreGive(robot->handle->evaluate_status);
     }
 }
+
+
+
+static void set_rob_mode(Mobile_Platform_t* robot, robot_mode_t mode){
+    robot->handle->mode = mode;
+}
+
 
 
 /**
@@ -317,6 +422,12 @@ static void set_rob_state(robot_status_t status){
 
 
 void Robot_Init(Mobile_Platform_t* robot){
+
+    /*create robot internal state handle*/
+    robot->handle = malloc(sizeof(struct robot_internal_state_t));
+    if (robot->handle == NULL){
+        return;
+    }
 
     for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
         motor_handle_t* mot_handle = &motors[idx];
@@ -338,19 +449,31 @@ void Robot_Init(Mobile_Platform_t* robot){
     robot->actual_speed = 0;
     robot->current_distance = 0;
 
-    m_rob_state.activate_mode = xSemaphoreCreateMutex();
-    m_rob_state.evaluate_status = xSemaphoreCreateMutex();
+    robot->handle->coordinares.x_pos = 0;
+    robot->handle->coordinares.y_pos = 0;
+    robot->handle->coordinares.z_pos = 0;
 
-    m_rob_state.orient.actual = 0.0;
-    m_rob_state.distance.current_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
-    m_rob_state.current_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
+    robot->handle->actual_linear_speed = 0.f;
+
+    robot->handle->mov_phase = STOP;
+
+    robot->handle->acc_setpoint = 100.f;  //TODO: default value
+
+    robot->handle->activate_mode = xSemaphoreCreateMutex();
+    robot->handle->evaluate_status = xSemaphoreCreateMutex();
+
+    robot->handle->orient.actual = 0.f;
+    robot->handle->current_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
 
     HK_Init(robot);
 
-    set_rob_state(ROB_IDLE);
+    Robot_Stop(robot);
 }
 
 void Robot_UpdateMotionStatus(Mobile_Platform_t* robot){
+    
+    //IMU euler orient
+    Sensor_GetValue(IMU, &robot->handle->imu_orient);
 
     for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
         motor_handle_t* mot_handle = robot->motors[idx];
@@ -388,104 +511,155 @@ void Robot_SetWheelSpeed(Mobile_Platform_t* robot, int32_t speed_right, int32_t 
 
 void Robot_SetDistance(Mobile_Platform_t* robot, float distance) {
 
-    if( xSemaphoreTake(m_rob_state.activate_mode, 10) == pdPASS){
+    if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
+        
+        set_rob_mode(robot, DISTANCE_MODE);
+        robot->handle->distance.mode_on = true;
+        robot->handle->distance.actual_distance = 0;
+        robot->handle->distance.setpoint_distance = distance;
+        robot->handle->distance.start_time = HAL_GetTick()/portTICK_PERIOD_MS;
 
-        m_rob_state.distance.mode_on = true;
-        m_rob_state.distance.actual_distance = 0;
-        m_rob_state.distance.setpoint_distance = distance;
-        m_rob_state.distance.start_time = HAL_GetTick()/portTICK_PERIOD_MS;
-        m_rob_state.distance.current_time = m_rob_state.distance.start_time;
+        robot->handle->mov_phase = MOVEMENT;
 
         if (RAMP_DIST != 0 && (float)RAMP_DIST < distance){
-            m_rob_state.distance.ramp_distance = distance - (float)RAMP_DIST;
+            robot->handle->distance.ramp_distance = distance - (float)RAMP_DIST;
         }
 
         if (distance < 0.f){
             Robot_SetSpeed(robot, -robot->speed_setpoint);
         }
-        xSemaphoreGive(m_rob_state.activate_mode);
+        xSemaphoreGive(robot->handle->activate_mode);
 
-        set_rob_state(ROB_IN_PROGRESS);
+        set_rob_state(robot, ROB_IN_PROGRESS);
 
-        HK_Setpoints(&m_rob_state.distance.setpoint_distance, DISTANCE);
+        HK_Setpoints(&robot->handle->distance.setpoint_distance, DISTANCE);
     }
 }
 
 void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms)
 {
-    if( xSemaphoreTake(m_rob_state.activate_mode, 10) == pdPASS){
+    if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
 
-        m_rob_state.timer.mode_on = true;
-        m_rob_state.timer.start_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
-        m_rob_state.timer.stop_time = ms;
+        set_rob_mode(robot, TIMER_MODE);
+        robot->handle->timer.mode_on = true;
+        robot->handle->timer.start_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
+        robot->handle->timer.stop_time = ms;
 
-        xSemaphoreGive(m_rob_state.activate_mode);
+        xSemaphoreGive(robot->handle->activate_mode);
 
-        set_rob_state(ROB_IN_PROGRESS);
+        set_rob_state(robot, ROB_IN_PROGRESS);
 
         uint32_t setpoint = ms;
         HK_Setpoints(&setpoint, TIMER);
     }
 }
 
+static rob_coord_t calculate_coord_offset(rob_coord_t actual, int32_t x_pos, int32_t y_pos){
+
+    rob_coord_t delta;
+    delta.z_pos = 0;
+
+    if (x_pos < 0){
+        delta.x_pos = (actual.x_pos <= 0) ? x_pos - actual.x_pos : actual.x_pos - x_pos;
+    } else {
+        delta.x_pos = x_pos - actual.x_pos;
+    }
+
+    if (y_pos < 0){
+        delta.y_pos = (actual.y_pos <= 0) ? y_pos - actual.y_pos : actual.y_pos - y_pos;
+    } else {
+        delta.y_pos = y_pos - actual.y_pos;
+    }
+
+    return delta;
+}
+
+/**
+ * @brief Move to point in global coordinates
+ * 
+ * @param robot 
+ * @param speed 
+ * @param x_pos 
+ * @param y_pos 
+ */
 void Robot_MoveToPoint(Mobile_Platform_t* robot, int32_t speed, int32_t x_pos, int32_t y_pos) {
 
-    if( xSemaphoreTake(m_rob_state.activate_mode, 10) == pdPASS){
+    if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
 
-        float angle = RAD_TO_DEG((float)atan((double)(y_pos)/(double)(x_pos)));
+        set_rob_mode(robot, POINT_MODE);
 
         //Get relative distance to the position
-        m_rob_state.setpoint_coord.x_pos = x_pos - m_rob_state.coordinares.x_pos;
-        m_rob_state.setpoint_coord.y_pos = y_pos - m_rob_state.coordinares.y_pos;
+        rob_coord_t offset = calculate_coord_offset(robot->handle->coordinares, x_pos, y_pos);
+
+        robot->handle->setpoint_coord.x_pos = offset.x_pos;
+        robot->handle->setpoint_coord.y_pos = offset.y_pos;
         robot->speed_setpoint = speed;
 
-        m_rob_state.distance.preset = true;
+        float angle = RAD_TO_DEG((float)atan2f((float)(offset.y_pos), (float)(offset.x_pos)));
+        robot->handle->distance.preset = true;
 
-        xSemaphoreGive(m_rob_state.activate_mode);
+        xSemaphoreGive(robot->handle->activate_mode);
 
-        set_rob_state(ROB_IN_PROGRESS);
+        set_rob_state(robot, ROB_IN_PROGRESS);
+
         set_angle(robot, ALIGN_SPEED, angle);
 
-        HK_Setpoints(&m_rob_state.setpoint_coord, POINT);
+        //go to point is handled internally
+        if (robot->handle->mode == ORIENT_MODE){
+            return;
+        }
+
+        float distance = (float)sqrt((offset.x_pos*offset.x_pos) + (offset.y_pos*offset.y_pos));
+
+        Robot_SetSpeed(robot, speed);
+        Robot_SetDistance(robot, distance);
+
+
+        HK_Setpoints(&robot->handle->setpoint_coord, POINT);
     }
 }
 
 void Robot_Rotate(Mobile_Platform_t* robot, int32_t speed, int16_t angle_setpoint) {
 
-    if( xSemaphoreTake(m_rob_state.activate_mode, 10) == pdPASS){
+    if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
 
         robot->speed_setpoint = speed;
 
-        xSemaphoreGive(m_rob_state.activate_mode);
+        xSemaphoreGive(robot->handle->activate_mode);
 
-        set_rob_state(ROB_IN_PROGRESS);
         set_angle(robot, speed, (float)angle_setpoint);
 
-        HK_Setpoints(&m_rob_state.orient.setpoint, ROTATE);
+        if (robot->handle->mov_phase == MOVEMENT){
+            set_rob_state(robot, ROB_IN_PROGRESS);
+            HK_Setpoints(&robot->handle->orient.setpoint, ROTATE);
+        }
+
     }
 }
 
 void Robot_Stop(Mobile_Platform_t* robot) {
 
-    if( xSemaphoreTake(m_rob_state.activate_mode, 10) == pdPASS){
+    if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
+        set_rob_mode(robot, NONE);
 
-        m_rob_state.distance.mode_on = false;
-        m_rob_state.distance.actual_distance = 0;
-        m_rob_state.distance.setpoint_distance = 0;
-        m_rob_state.distance.start_time = 0;
-        m_rob_state.distance.current_time = 0;
-        m_rob_state.distance.slow_ramp_on = false;
-        m_rob_state.distance.ramp_distance = 0.f;
+        robot->handle->distance.mode_on = false;
+        robot->handle->distance.actual_distance = 0;
+        robot->handle->distance.setpoint_distance = 0;
+        robot->handle->distance.start_time = 0;
+        robot->handle->distance.current_time = 0;
+        robot->handle->distance.slow_ramp_on = false;
+        robot->handle->distance.ramp_distance = 0.f;
 
 
-        m_rob_state.timer.mode_on = false;
-        m_rob_state.timer.start_time = 0;
-        m_rob_state.timer.stop_time = 0;
+        robot->handle->timer.mode_on = false;
+        robot->handle->timer.start_time = 0;
+        robot->handle->timer.stop_time = 0;
 
-        m_rob_state.orient.mode_on = false;
-        m_rob_state.orient.clockwise_on = false;
-        m_rob_state.orient.setpoint = 0.0;
+        robot->handle->orient.mode_on = false;
+        robot->handle->orient.clockwise_on = false;
+        robot->handle->orient.setpoint = 0.0;
 
+        robot->handle->mov_phase = STOP;
 
         robot->speed_setpoint = 0;
 
@@ -495,18 +669,18 @@ void Robot_Stop(Mobile_Platform_t* robot) {
             motor_stop(mot_handle);
         }
 
-        xSemaphoreGive(m_rob_state.activate_mode);
+        xSemaphoreGive(robot->handle->activate_mode);
 
-        set_rob_state(ROB_IDLE);
+        set_rob_state(robot, ROB_IDLE);
     }
 }
 
 
 void Robot_Task(Mobile_Platform_t* robot) {
 
-    if (m_rob_state.status == ROB_IDLE){
+    if (Robot_Status(robot) == ROB_IDLE){
 
-        bool cmd_on = Execute_Command();
+        bool cmd_on = Execute_Command(robot);
 
         if (cmd_on){ 
             ROB_DEBUG("RUNNING COMMAND...\r\n");
@@ -527,14 +701,65 @@ void Robot_Task(Mobile_Platform_t* robot) {
 
 }
 
+void Robot_ManualCtrl(Mobile_Platform_t* robot, manual_ctrl_command_t ctrl)
+{
+    enum {
+        UP = 1,
+        RIGHT = UP << 1,
+        LEFT = RIGHT << 1,
+        DOWN = LEFT << 1,
+    };
+    uint8_t manual_control; //= handle_manual_ctrl(ctrl);
+    
+    if (ctrl.bit.up && !(ctrl.bit.left || ctrl.bit.right || ctrl.bit.down)){
+        Robot_SetSpeed(robot, MANUAL_SPEED);
+    }
+    else if((ctrl.bit.up && ctrl.bit.right) && !(ctrl.bit.left || ctrl.bit.down)){
+        Robot_SetWheelSpeed(robot, MANUAL_SPEED/2, MANUAL_SPEED);
+    }
+    else if((ctrl.bit.up && ctrl.bit.left) && !(ctrl.bit.right || ctrl.bit.down)){
+        Robot_SetWheelSpeed(robot, MANUAL_SPEED, MANUAL_SPEED/2);
+    }
+    else if((ctrl.bit.right && ctrl.bit.left) && !(ctrl.bit.up || ctrl.bit.down)){
+        Robot_SetWheelSpeed(robot, MANUAL_SPEED, -MANUAL_SPEED);
+    }
+    else if((ctrl.bit.up && ctrl.bit.down) && !(ctrl.bit.left || ctrl.bit.right)){
+        Robot_SetWheelSpeed(robot, -MANUAL_SPEED, MANUAL_SPEED);
+    }
+    else if (ctrl.bit.down && !(ctrl.bit.left || ctrl.bit.right || ctrl.bit.up)){
+        Robot_SetSpeed(robot, -MANUAL_SPEED);
+    }
+    else if((ctrl.bit.down && ctrl.bit.right) && !(ctrl.bit.left || ctrl.bit.up)){
+        Robot_SetWheelSpeed(robot, -MANUAL_SPEED/2, -MANUAL_SPEED);
+    }
+    else if((ctrl.bit.down && ctrl.bit.left) && !(ctrl.bit.right || ctrl.bit.up)){
+        Robot_SetWheelSpeed(robot, -MANUAL_SPEED, -MANUAL_SPEED/2);
+    }
+    else {
+        Robot_SetSpeed(robot, 0);
+    }
+}
+
+void Robot_SetMode(Mobile_Platform_t* robot, robot_mode_t mode) {
+    bool mode_is_none = Robot_ActiveMode(robot) == NONE;
+    if ((mode != MANUAL_MODE) || (mode != AUTONOMOUS_MODE) || !mode_is_none){
+        return;
+    }
+    set_rob_mode(robot, mode);
+}
+
 robot_status_t Robot_Status(Mobile_Platform_t* robot) {
-    return m_rob_state.status;
+    return robot->handle->status;
+}
+
+robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot) {
+    return robot->handle->mode;
 }
 
 rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot) {
-    return m_rob_state.coordinares;
+    return robot->handle->coordinares;
 }
 
-float Robot_GetOrient(Mobile_Platform_t* robot) {
-    return m_rob_state.orient.actual;
+euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot) {
+    return robot->handle->imu_orient;
 }
