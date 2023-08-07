@@ -10,6 +10,7 @@
 #include "cmsis_os.h"
 #include <math.h>
 
+#define MAX_ANGLE		180.0f
 #define G_acc 			981.0f
 #define PI 				3.14f
 #define RAD_TO_DEG		(180.0f / PI)
@@ -40,14 +41,23 @@ static int16_t* gyro_dead_zone(int16_t *speed, int16_t d_zone)
 
 static float yaw_calculation(int32_t *axis, float roll, float pitch)
 {
-    float Xheading = axis[x] * cosf(pitch) + axis[y] * sinf(roll) * sinf(pitch) + axis[z] * cosf(roll) * sinf(pitch);
-    float Yheading = axis[y] * cosf(roll) - axis[z] * sinf(pitch);
+    float Xheading = (float)axis[x] * cosf(pitch) + (float)axis[y] * sinf(roll) * sinf(pitch) + (float)axis[z] * cosf(roll) * sinf(pitch);
+    float Yheading = (float)axis[y] * cosf(roll) - (float)axis[z] * sinf(pitch);
 
-    const float declination_shenzhen = -2.2;
 
-    float heading = atan2f(Yheading, Xheading) + declination_shenzhen;
+    float heading = atan2f(Yheading, Xheading);
 
     return heading;
+}
+
+static float yaw_calculation_2(int32_t *axis, float roll, float pitch)
+{
+
+
+
+    float yaw = atan2f((float)axis[x], (float)axis[y]);
+
+    return yaw;
 }
 
 
@@ -88,15 +98,14 @@ euler_angles_t ComplementaryFilter(int16_t *acc, int16_t *speed, int32_t *axis)
 	filter->actual_orient.roll =  alpha*filter->acc_orient.roll + (1.0f - alpha)*filter->gyro_orient.roll;
 	filter->actual_orient.pitch =  alpha*filter->acc_orient.pitch + (1.0f - alpha)*filter->gyro_orient.pitch;
 
-	/*filter->actual_orient.yaw = yaw_calculation(axis,
+	filter->actual_orient.yaw = yaw_calculation(axis,
 												filter->actual_orient.roll,
-												filter->actual_orient.pitch);*/
+												filter->actual_orient.pitch);
 
 
 	angles_estimate.roll = filter->actual_orient.roll * RAD_TO_DEG;
 	angles_estimate.pitch = filter->actual_orient.pitch * RAD_TO_DEG;
-	angles_estimate.yaw = 0; //AK sensor not working for now
-	//angles_estimate.yaw = filter->actual_orient.yaw * RAD_TO_DEG;
+	angles_estimate.yaw = MAX_ANGLE + filter->actual_orient.yaw * RAD_TO_DEG + MAGNETIC_DECLINATION;
 
 	first_scan = 0;
 	filter->last_tick = HAL_GetTick();

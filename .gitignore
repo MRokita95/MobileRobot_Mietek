@@ -2,3 +2,4 @@ Debug/
 Build/
 Release/
 *.launch
+*.prefs

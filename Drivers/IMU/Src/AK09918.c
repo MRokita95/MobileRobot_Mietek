@@ -16,7 +16,7 @@
  *			PRIVATE FUNCTIONS				*
  ********************************************/
 static uint8_t _getRawMode(AK0_Handle_t *akInstance, I2C_HandleTypeDef *i2cInstance) {
-    if (!I2C_AKreadByte(i2cInstance, akInstance->addr, AK09918_CNTL2, akInstance->buffer) != HAL_OK) {
+    if (I2C_AKreadByte(i2cInstance, akInstance->addr, AK09918_CNTL2, akInstance->buffer) != HAL_OK) {
         return 0xFF;
     } else {
         return akInstance->buffer[0];
@@ -36,6 +36,7 @@ AK09918_err_type_t AK_getRawData(AK0_Handle_t *akInstance, I2C_HandleTypeDef *i2
                 return AK09918_ERR_TIMEOUT;
             }
             count ++;
+            HAL_Delay(1);
         }
     }
 
@@ -68,11 +69,11 @@ AK09918_err_type_t AK_initialize(AK0_Handle_t *akInstance, I2C_HandleTypeDef *i2
     }
     akInstance->mode = mode;
 
-    if (mode == AK09918_NORMAL) {
-        return AK09918_ERR_OK;
-    } else {
+    //if (mode == AK09918_NORMAL) {
+      //  return AK09918_ERR_OK;
+    //} else {
         return AK_switchMode(akInstance, i2cInstance, akInstance->mode);
-    }
+    //}
 }
 
 AK09918_err_type_t AK_isDataReady(AK0_Handle_t *akInstance, I2C_HandleTypeDef *i2cInstance) {
