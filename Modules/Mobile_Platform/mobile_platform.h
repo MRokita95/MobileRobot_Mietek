@@ -69,9 +69,9 @@ void HK_Update(Mobile_Platform_t* robot);
 
 void HK_Setpoints(void* setpoint, current_setpoint_t setpoint_type);
 
-bool Execute_Command();
+bool Execute_Command(Mobile_Platform_t *robot);
 
-void End_Command_Execution(command_status_t status);
+void End_Command_Execution(Mobile_Platform_t *robot, command_status_t status);
 
 
 euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot);

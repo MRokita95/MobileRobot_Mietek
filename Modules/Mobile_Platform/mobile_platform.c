@@ -214,7 +214,7 @@ static void eval_rob_state(Mobile_Platform_t* robot) {
             //Otherway - End Command with proper status
             else {
                 Robot_Stop(robot);
-                End_Command_Execution(DONE_OK);
+                End_Command_Execution(robot, DONE_OK);
 
                 //TODO:
                 //End_Command_Execution(TIMEOUT);
@@ -233,7 +233,7 @@ static void eval_rob_state(Mobile_Platform_t* robot) {
         } 
         else if (robot->handle->mov_phase == STOP){
             Robot_Stop(robot);
-            End_Command_Execution(DONE_OK);
+            End_Command_Execution(robot, DONE_OK);
         }
     }
 
@@ -241,7 +241,7 @@ static void eval_rob_state(Mobile_Platform_t* robot) {
         uint32_t dt = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
         if (dt - robot->handle->timer.start_time >= robot->handle->timer.stop_time){
             Robot_Stop(robot);
-            End_Command_Execution(DONE_OK);
+            End_Command_Execution(robot, DONE_OK);
 
             //TODO:
             //End_Command_Execution(ERR);
@@ -680,7 +680,7 @@ void Robot_Task(Mobile_Platform_t* robot) {
 
     if (Robot_Status(robot) == ROB_IDLE){
 
-        bool cmd_on = Execute_Command();
+        bool cmd_on = Execute_Command(robot);
 
         if (cmd_on){ 
             ROB_DEBUG("RUNNING COMMAND...\r\n");
