@@ -4,92 +4,134 @@
 #include <string.h>
 #include "imu.h"
 #include "filters.h"
+#include "sensor.h"
 #include "imu_handle.h"
 #include "sensors_common.h"
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 
-extern IMU_Handle_t imu_sensor;
+
+
+/**
+ * @brief IMU sensor data access function callback
+ * 
+ */
+static void imu_orient_access(const Sensor_t* me, void* data, bool write);
+
+/**
+ * @brief IMU sensor data update
+ * 
+ */
+static void imu_orient_update(const Sensor_t* me);
+
+
+/**
+ * @brief PRIVATE DATA 
+ * 
+ */
+
+
+static const struct data_handling_vtable Sensors_VTABLE[SENSOR_MAX] = 
+{
+	[IMU] = {.data_access = imu_orient_access, .data_update = imu_orient_update}
+};
+
+
+static Sensor_t sensors_table[SENSOR_MAX];
+
+
 extern I2C_HandleTypeDef hi2c1;
 
 
-static SemaphoreHandle_t orient_access_sem;
-static euler_angles_t actual_orient;
+/**
+ * @brief PRIVATE FUNCTIONS 
+ * 
+ */
+static void imu_orient_update(const Sensor_t* me){
+    euler_angles_t orient = IMU_CalcEuler((IMU_Handle_t)me->sensor_handle);
 
-static void orient_access(euler_angles_t* orient, bool write){
+    me->vptr->data_access(me, &orient, true);
+}
+
+static void imu_orient_access(const Sensor_t* me, void* data, bool write){
     
-    if(xSemaphoreTake(orient_access_sem, 10) == pdPASS){
+    static euler_angles_t actual_orient;
+
+    if(xSemaphoreTake(me->data_access_sem, 10) == pdPASS){
         if (write){
-            actual_orient = *orient;
+            memcpy(&actual_orient, data, me->data_size);
         } else {
-            *orient = actual_orient;
+            memcpy(data, &actual_orient, me->data_size);
         }
-        xSemaphoreGive(orient_access_sem);
+        xSemaphoreGive(me->data_access_sem);
     }
 }
 
-static bool orient_change_detection(const euler_angles_t* new_orient){
 
-    static euler_angles_t prev_orient;
-
-    if ((abs((int16_t)new_orient->roll - (int16_t)prev_orient.roll) >= 1u) ||
-        (abs((int16_t)new_orient->pitch - (int16_t)prev_orient.pitch) >= 1u) ||
-        (abs((int32_t)new_orient->yaw - (int32_t)prev_orient.yaw) >= 1u)) {
-        
-        orient_access(new_orient, true);
-
-        prev_orient = *new_orient;
-        return true;
-    }
-    return false;
-}
-
-
-
-void Sensor_Init(){
+/**
+ * @brief PUBLIC FUNCTIONS 
+ * 
+ */
+void* Sensor_Init(sensors_id_t sensor){
     
-	orient_access_sem = xSemaphoreCreateMutex();
-    imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
+    switch (sensor)
+    {
+    case IMU:
+        {
+            IMU_Handle_t imu_sensor;
 
-    bool cal_status = IMU_GyroCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
+            imu_sensor=IMU_Initialize(ICM20600_I2C_ADDR2, &hi2c1);
 
-    if (cal_status == IMU_OK) {
-        SENS_DEBUG("Calibrated OK \r\n");
-    } else {
-        SENS_DEBUG("Gyro NOT calibrated \r\n");
+            if (imu_sensor == NULL){
+                return NULL;
+            }
+
+            sensors_table[sensor].sensor_id = sensor;
+            sensors_table[sensor].data_access_sem = xSemaphoreCreateMutex();
+            sensors_table[sensor].vptr = &Sensors_VTABLE[sensor];
+            sensors_table[sensor].sensor_handle = (IMU_Handle_t)imu_sensor;
+            sensors_table[sensor].data_size = sizeof(euler_angles_t);
+
+
+            bool cal_status = IMU_GyroCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
+
+            if (cal_status == IMU_OK) {
+                SENS_DEBUG("Calibrated OK \r\n");
+            } else {
+                SENS_DEBUG("Gyro NOT calibrated \r\n");
+            }
+
+            //cal_status = IMU_MagnCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
+
+            //if (cal_status == IMU_OK) {
+                //SENS_DEBUG("Calibrated OK \r\n");
+            //} else {
+                //SENS_DEBUG("Gyro NOT calibrated \r\n");
+            //}
+
+            return imu_sensor;
+        }
+        break;
     }
 
-    cal_status = IMU_MagnCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
 
-    if (cal_status == IMU_OK) {
-        SENS_DEBUG("Calibrated OK \r\n");
-    } else {
-        SENS_DEBUG("Gyro NOT calibrated \r\n");
-    }
+    return NULL;
 }
 
 void Sensor_Task(){
 
+    for (int8_t sens_idx = 0; sens_idx < SENSOR_MAX; sens_idx++){
 
-    euler_angles_t orient = IMU_CalcEuler(imu_sensor);
-
-    (void)orient_change_detection(&orient);
+    	Sensor_t *sensor = &sensors_table[sens_idx];
+    	sensor->vptr->data_update(sensor);
+    }
 
 }
 
 
-void Sensor_GetValue(sensors_t sensor, void* value){
-
-    euler_angles_t orient;
-    switch (sensor)
-    {
-    case IMU:
-        orient_access(&orient, false);
-        memcpy(value, &orient, sizeof(orient));
-        break;
-    
-    default:
-        break;
-    }
+void Sensor_GetValue(sensors_id_t sensor_id, void* value){
+	//TODO add guard
+	Sensor_t *sensor = &sensors_table[sensor_id];
+	sensor->vptr->data_access(sensor, value, false);
 }
 

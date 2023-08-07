@@ -153,7 +153,7 @@ void vTask_Communication(void const * argument){
 
 void vTask_Sensors(void const * argument) {
 
-    Sensor_Init();
+    imu_sensor = Sensor_Init(IMU);
       
 
     TickType_t xNextWakeTime;
