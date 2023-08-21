@@ -68,4 +68,8 @@ void Robot_UpdateMotionStatus(Mobile_Platform_t* robot);
 
 void Robot_Task(Mobile_Platform_t* robot);
 
+euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot);
+
+rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot);
+
 #endif

@@ -3,3 +3,4 @@ Build/
 Release/
 *.launch
 *.prefs
+.metadata/*

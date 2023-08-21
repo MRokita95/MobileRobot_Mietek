@@ -112,6 +112,7 @@ motor_handle_t motors[MOTORS_CNT] = {
     float acc_setpoint;
     SemaphoreHandle_t activate_mode;
     SemaphoreHandle_t evaluate_status;
+    SemaphoreHandle_t access_rob_data;
 };
 
 static reference_motor_t ref_table[MOTORS_CNT];
@@ -461,6 +462,7 @@ void Robot_Init(Mobile_Platform_t* robot){
 
     robot->handle->activate_mode = xSemaphoreCreateMutex();
     robot->handle->evaluate_status = xSemaphoreCreateMutex();
+    robot->handle->access_rob_data = xSemaphoreCreateMutex();
 
     robot->handle->orient.actual = 0.f;
     robot->handle->current_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
@@ -472,17 +474,21 @@ void Robot_Init(Mobile_Platform_t* robot){
 
 void Robot_UpdateMotionStatus(Mobile_Platform_t* robot){
     
-    //IMU euler orient
-    Sensor_GetValue(IMU, &robot->handle->imu_orient);
+    if( xSemaphoreTake(robot->handle->access_rob_data, 10) == pdPASS){
+        //IMU euler orient
+        Sensor_GetValue(IMU, &robot->handle->imu_orient);
 
-    for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
-        motor_handle_t* mot_handle = robot->motors[idx];
+        for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
+            motor_handle_t* mot_handle = robot->motors[idx];
 
-        if (mot_handle->encoder_present){
-            motor_update_speed(mot_handle);
-        } 
+            if (mot_handle->encoder_present){
+                motor_update_speed(mot_handle);
+            } 
+        }
+        eval_motion_status(robot);
+
+        xSemaphoreGive(robot->handle->access_rob_data);
     }
-    eval_motion_status(robot);
 }
 
 
@@ -757,9 +763,30 @@ robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot) {
 }
 
 rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot) {
-    return robot->handle->coordinares;
+
+    const uint32_t wait_time = 100; 
+    if( xSemaphoreTake(robot->handle->update_rob_data, wait_time) == pdPASS){
+
+        rob_coord_t rob_coord = robot->handle->coordinares;
+
+        xSemaphoreGive(robot->handle->access_rob_data);
+
+        return rob_coord;
+    }
 }
 
 euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot) {
-    return robot->handle->imu_orient;
+
+    const uint32_t wait_time = 100; 
+    if( xSemaphoreTake(robot->handle->update_rob_data, wait_time) == pdPASS){
+
+        euler_angles_t rob_orient;
+        rob_orient.pitch = robot->handle->imu_orient.pitch;
+        rob_orient.roll = robot->handle->imu_orient.roll;
+        rob_orient.yaw = robot->handle->orient.actual;  //until magnetometer uncalibrated
+
+        xSemaphoreGive(robot->handle->access_rob_data);
+
+        return rob_orient;
+    }
 }

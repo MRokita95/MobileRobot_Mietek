@@ -73,9 +73,6 @@ bool Execute_Command(Mobile_Platform_t *robot);
 
 void End_Command_Execution(Mobile_Platform_t *robot, command_status_t status);
 
-
-euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot);
-
 void Robot_Rotate(Mobile_Platform_t* robot, int32_t speed, int16_t angle_setpoint);
 
 void Robot_SetSpeed(Mobile_Platform_t* robot, int32_t speed);
@@ -95,7 +92,5 @@ void Robot_ManualCtrl(Mobile_Platform_t* robot, manual_ctrl_command_t ctrl);
 robot_status_t Robot_Status(Mobile_Platform_t* robot);
 
 robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot);
-
-rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot);
 
 #endif
