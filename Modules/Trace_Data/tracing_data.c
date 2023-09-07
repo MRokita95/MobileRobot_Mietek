@@ -109,3 +109,60 @@ void Trace_PullData(){
     }
 
 }
+
+
+
+void Trace_FlushData(trace_data_t *data, uint16_t *size){
+
+    uint32_t *buffer = m_trace_handler.last_data;
+    trace_data_t *data_out = data;
+
+    uint16_t req_buff_size1 = *size;
+    uint16_t req_buff_size2 = 0u;
+
+    if ((m_trace_handler.read_pointer + *size) > TRACE_BUFFER_SIZE){
+        req_buff_size1 = TRACE_BUFFER_SIZE - m_trace_handler.read_pointer;
+
+        req_buff_size2 = *size - req_buff_size1;
+    }
+
+
+
+    /* pointers checking */
+    if (m_trace_handler.read_pointer > m_trace_handler.write_pointer){
+        if ((req_buff_size2 >= m_trace_handler.write_pointer) && (req_buff_size2 != 0u)){
+            req_buff_size2 = m_trace_handler.write_pointer - 1u;
+        }
+    } else if (m_trace_handler.read_pointer < m_trace_handler.write_pointer) {
+        if ((m_trace_handler.read_pointer + req_buff_size1) >= m_trace_handler.write_pointer){
+            req_buff_size1 = m_trace_handler.write_pointer - m_trace_handler.read_pointer - 1u;
+        }
+    } else {
+        req_buff_size1 = 0u;
+    }
+
+    
+
+    if( xSemaphoreTake(m_trace_handler.buffer_access, 10) == pdPASS){
+        
+        uint16_t data_idx = 0u;
+        for (data_idx = 0; data_idx < req_buff_size1; data_idx++){
+            memcpy(&data_out[data_idx], &buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
+
+            m_trace_handler.read_pointer++;
+        }
+
+        clamp_pointer(&m_trace_handler.read_pointer);
+
+        for (data_idx; data_idx < req_buff_size1 + req_buff_size2; data_idx++){
+            memcpy(&data_out[data_idx], &buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
+
+            m_trace_handler.read_pointer++;
+        }
+
+        xSemaphoreGive(m_trace_handler.buffer_access);
+
+        *size = data_idx;
+    }
+
+}

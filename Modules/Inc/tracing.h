@@ -35,6 +35,6 @@ void Trace_PullData(void);
  * @brief 
  * 
  */
-void Trace_FlushData(trace_data_t *data, uint16_t size);
+void Trace_FlushData(trace_data_t *data, uint16_t *size);
 
 #endif

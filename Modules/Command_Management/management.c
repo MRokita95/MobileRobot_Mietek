@@ -10,6 +10,7 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 #include "queue.h"
+#include "tracing.h"
 
 
 
@@ -28,6 +29,16 @@ typedef enum{
 static comm_task_response_frame_t m_task_response;
 
 /**
+ * @brief Trace Data buffer 
+ * allocates on heap based on the required size
+ * freed when last data element is sent
+ * 
+ */
+trace_data_t* m_trace_data;
+uint16_t m_tr_data_size;
+bool m_transfer_ongoing;
+
+/**
  * @brief Comm Frame for tasks
  * 
  */
@@ -39,6 +50,55 @@ extern QueueHandle_t xCommQueue;
  * 
  */
 extern QueueHandle_t xRespQueue;
+
+
+
+/**
+ * @brief Response to 
+ * 
+ */
+extern QueueHandle_t xTraceQueue;
+
+
+static task_exec_status_t collect_robot_data(rob_data_response_t* rob_data){
+    if (rob_data == NULL){
+        return INVALID_PARAM;
+    }
+
+    //rob_data.robot_status = 
+}
+
+
+static inline bool trace_data_transfer_on(){
+    return m_transfer_ongoing;
+}
+
+
+/**
+ * @brief Send trace data to related queue
+ * 
+ * 
+ */
+static void send_trace_data(){
+    
+    static uint16_t data_size = 0;
+    static trace_data_t* trace_ptr = NULL;
+
+    if ((data_size == 0u) && (m_tr_data_size != 0) && !m_transfer_ongoing){
+        m_transfer_ongoing = true;
+        data_size = m_tr_data_size;
+        trace_ptr = m_trace_data;
+    } else { 
+        xQueueSend(xTraceQueue, trace_ptr, portMAX_DELAY);
+        trace_ptr++;
+        data_size--;
+        if (data_size == 0u){
+            free(m_trace_data);
+            m_tr_data_size = 0u;
+            m_transfer_ongoing = false;
+        }
+    }
+}
 
 
 
@@ -126,7 +186,7 @@ static bool deserialize_rob_command(command_type_t cmd_type, command_t* cmd, uin
 
 static task_exec_status_t send_for_execution(comm_task_frame_t* task){
 
-    task_exec_status_t status;
+    task_exec_status_t status = OK;
 
     switch (task->appdata.application_id)
     {
@@ -139,9 +199,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         if (cmd_ok){
             command_buff_status_t buff_status = command_add(rob_cmd);
 
-            if (buff_status == BUFF_OK){
-                status = OK;
-            } else {
+            if (buff_status != BUFF_OK){
                 status = FAILED_EXEC;
                 m_task_response.task_error_code = (uint16_t)buff_status;
             }
@@ -155,9 +213,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         case FLASH_SAVE_FNC_ID:
         {
             param_ret_status_t param_sts = Param_SaveToFlash();
-            if (param_sts == PARAM_OK){
-                status = OK;
-            } else {
+            if (param_sts != PARAM_OK){
                 status = FAILED_EXEC;
                 m_task_response.task_error_code = (uint16_t)param_sts;
             }
@@ -166,9 +222,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         case FLASH_LOAD_FNC_ID:
         {
             param_ret_status_t param_sts = Param_LoadFromFlash();
-            if (param_sts == PARAM_OK){
-                status = OK;
-            } else {
+            if (param_sts != PARAM_OK){
                 status = FAILED_EXEC;
                 m_task_response.task_error_code = (uint16_t)param_sts;
             }
@@ -190,9 +244,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
             void* par_val; 
             memcpy(&par_val, &task->appdata.parameters[2], 4u);  //Get Max size
             param_ret_status_t param_sts = Param_Set(par_id, &par_val);
-            if (param_sts == PARAM_OK){
-                status = OK;
-            } else {
+            if (param_sts != PARAM_OK){
                 status = FAILED_EXEC;
                 m_task_response.task_error_code = (uint16_t)param_sts;
             }
@@ -219,9 +271,47 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
             break;
         }
     
-    default:
+    case HK_APP_ID:
+    {
+        /* task->appdata.function_id - not used  */
+        rob_data_response_t rob_data;
+        status = collect_robot_data(&rob_data);
         break;
     }
+
+
+    case TR_DATA_APP_ID:
+    {
+        /* task->appdata.function_id - not used  */
+        uint16_t data_size = 0u;
+        memcpy(&data_size, &task->appdata.parameters[0], 2u);
+
+        if (data_size == 0u){
+            status = INVALID_PARAM;
+            break;
+        } else if ((m_tr_data_size != 0u) || trace_data_transfer_on()){
+            status = FAILED_EXEC;
+            break;
+        }
+
+        /* Size is OK, lets retreive data from the buffer but first allocate the buffer */
+        m_tr_data_size = data_size;
+        m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);   /* maybe not all data would be needed, but the maximum must be allocated */
+        Trace_FlushData(m_trace_data, &m_tr_data_size);
+
+        send_trace_data();
+        break;
+    }
+
+
+
+    
+    default:
+        status = INVALID_APP_ID;
+        break;
+    }
+
+    return status;
 }
 
 
@@ -233,6 +323,11 @@ void Management_Task(){
     //Comm_RetreiveBuffer(&task_buff[0], &size);
 
     //UBaseType_t cnt = uxQueueMessagesWaiting(xCommQueue);
+
+    /* trace transfer is ongoing - continue */
+    if (trace_data_transfer_on()){
+        send_trace_data();
+    }
 
      /* HouseKeeping data to send */
     if(xQueueReceive(xCommQueue, &task_buff, 10u) == pdTRUE) {
@@ -249,7 +344,7 @@ void Management_Task(){
                     xQueueSend(xRespQueue, &m_task_response, 10);
                     break;
                 }
-
+                task_buff[idx].header = PACKET_HEADER_READ;
             }
         }
 
