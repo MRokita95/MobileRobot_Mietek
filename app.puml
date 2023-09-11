@@ -1,0 +1,111 @@
+@startuml
+
+
+class SimpleSerial{
+    comm_port : char[]
+    send_data_polled()
+    recv_data_polled()
+}
+
+enum cmd_types{
+    ROB_APP
+    PARAM_APP
+    FLASH_APP
+    SENSOR_APP
+    HOUSEKEEPING_APP
+    TRACE_APP
+}
+
+class TaskDescriptor{
+    msg_size : int
+    msg_layout
+}
+
+class Command{
+    name : string
+    type : cmd_types
+    operation : uint8_t
+    parameters : char[]
+    serialize()
+    deserialize()
+}
+
+class TaskCommander{
+    serial* : SimpleSerial
+    raw_data[] : uint8_t
+
+    send()
+    send_and_check_status(int max_time)
+}
+
+class SubscribeList{
+    msg_type : int
+    callback : void (*notify_func)(data*)
+}
+
+class NotifierSubject{
+    subscribers: int
+    subscribe(int type, notify_func)
+    unsubscribe(int type)
+    notify()
+}
+
+class MessageObserver{
+    install()
+}
+
+
+class TaskReceiver{
+    serial* : SimpleSerial
+    raw_data[] : uint8_t
+    notifiers_list : SubscribeList* 
+
+    receive(int max_time)
+    add_subscription(int msg_type, callback)
+    remove_subscription(int msg_type)
+}
+
+class ApplicationData{
+    robot_status : int
+    robot_speed : int
+    robot_pos x,y,z
+    robot_orient roll, pitch, yaw
+
+    print_current_data()
+    notify_callback : void (*notify_func)(data*)
+}
+
+struct TraceData{
+    timestamp : int
+    position x,y,z
+    orient roll, pitch, yaw
+    speed : int
+}
+
+class TraceLogger{
+    data_waiting : bool
+    data* : TraceData
+    add_data(TraceData data)
+    print_trace_data()
+    notify_callback : void (*notify_func)(data*)
+}
+ 
+
+
+SimpleSerial --o "1"  TaskCommander
+SimpleSerial --o "1"  TaskReceiver
+
+cmd_types -- Command
+Command <|-- TaskCommander
+Command <|-- TaskReceiver
+
+TaskDescriptor <|-- Command
+
+MessageObserver --o   TaskReceiver
+
+TraceData <|-- TraceLogger
+
+TraceLogger -- NotifierSubject
+ApplicationData -- NotifierSubject
+
+@enduml
