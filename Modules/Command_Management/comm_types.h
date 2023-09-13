@@ -39,9 +39,9 @@ typedef struct {
     rob_coord_t actual_pos;
     rob_coord_t setpoint_pos;
     struct rob_orient{
-        uint8_t roll;
-        uint8_t pitch;
-        uint8_t yaw;
+        int16_t roll;
+        int16_t pitch;
+        int16_t yaw;
     };
 } rob_data_response_t;
 

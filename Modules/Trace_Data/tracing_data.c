@@ -16,6 +16,8 @@ typedef struct{
     uint8_t data_error;
     trace_data_t last_data;
     SemaphoreHandle_t buffer_access;
+    uint32_t last_timestamp;
+    uint32_t t_diff_setpoint;
 }trace_data_handling_t;
 
 trace_data_handling_t m_trace_handler;
@@ -47,6 +49,8 @@ void Trace_InitAccessInstances(Mobile_Platform_t *robot){
     robot_instance = robot;
 
     m_trace_handler.buffer_access = xSemaphoreCreateMutex();
+
+    m_trace_handler.t_diff_setpoint = TRACE_DATA_FREQUENCY/portTICK_RATE_MS;
 }
 
 static inline void clamp_pointer(uint16_t* pointer){
@@ -56,6 +60,13 @@ static inline void clamp_pointer(uint16_t* pointer){
 }
 
 void Trace_PullData(){
+
+
+    uint32_t curr_timestamp = xTaskGetTickCount();
+
+    if (((curr_timestamp - m_trace_handler.last_timestamp)portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint){
+        return;
+    }
 
     /* Get robot data */
     trace_data_t new_data;

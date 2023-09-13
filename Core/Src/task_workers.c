@@ -10,6 +10,7 @@
 #include "sensors_common.h"
 #include "param_handle.h"
 #include "commands.h"
+#include "tracing.h"
 
 
 #define CALIB_CNT     100u
@@ -51,19 +52,6 @@ char message_buffer[MESSAGE_LENGTH];
 
 #define TIMER_NUMBERS 2u
 #define EULER_TIMER 0u
-// BaseType_t TIMER_OK;
-// void Timer_Task_calc(TimerHandle_t xTimer);
-// static Timer_t Timers[TIMER_NUMBERS] =
-// {
-// 		[EULER_TIMER] = {
-// 				.timer_name = "IMU Euler angles calc",
-// 				.period_ms = 10,
-// 				.auto_reload = 1u,
-// 				.ID = 1u,
-// 				.timer_handle = Timer_Task_calc,
-// 				.buffer = {0}
-// 		}
-// };
 
 
 
@@ -181,15 +169,11 @@ void vTask_Robot(void const * argument){
 
   for(;;){
 
-	  TickType_t start  = xTaskGetTickCount();
-
 	vTaskDelayUntil( &xNextWakeTime, xBlockTime );
 
 	Robot_UpdateMotionStatus(&robot);
 
 	Robot_Task(&robot);
-
-	TickType_t stop  = xTaskGetTickCount();
 
   }
 }
@@ -208,6 +192,9 @@ void vTask_Management(void const * argument) {
       vTaskDelayUntil( &xNextWakeTime, xBlockTime );
 
       Management_Task();
+
+	  /* Perform trace info gathering */
+      Trace_PullData();
   }
 }
 

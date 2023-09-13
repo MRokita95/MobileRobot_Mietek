@@ -5,6 +5,9 @@
 #include "sensors_common.h"
 #include "robot.h"
 
+
+#define TRACE_DATA_FREQUENCY     (5000u)
+
 typedef enum{
     OK = 0,
     TRACE_BUFFER_FULL,
