@@ -71,6 +71,7 @@ void Param_Initialize(){
     ADD_SETTABLE_PARAM(KP_ID, 0.06, float);
     ADD_SETTABLE_PARAM(KI_ID, 0.9, float);
     ADD_SETTABLE_PARAM(KD_ID, 0.4, float);
+    ADD_SETTABLE_PARAM(ACCEL_SETP_ID, 100.0, float);
 
     Param_SaveToFlash();    //for trial
     /*  Check if parameters are store in FLASH.

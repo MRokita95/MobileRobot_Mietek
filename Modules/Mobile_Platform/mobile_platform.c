@@ -3,6 +3,7 @@
 #include "main.h"
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
+#include "param_handle.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -19,13 +20,17 @@
 
 #define ROUND_FLOAT(value) (value < 0) ? (value - 0.5) : (value + 0.5)
 
-
+#define ARRAY_SIZE(array) sizeof(array)/sizeof(*array)
 
 enum{
     right = 0,
     left,
 };
 
+typedef struct{
+    uint16_t id;
+    float* reference;
+} param_map_t;
 
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
@@ -118,6 +123,8 @@ motor_handle_t motors[MOTORS_CNT] = {
 static reference_motor_t ref_table[MOTORS_CNT];
 
 
+param_map_t rob_parameters_map[10];
+
 
 //private declarations
 static void set_rob_mode(Mobile_Platform_t* robot, robot_mode_t mode);
@@ -135,6 +142,50 @@ static inline int32_t max_signed(int32_t v1, int32_t v2) {
         return v1;
     } else {
         return (v1 > v2) ? v1 : v2;
+    }
+}
+
+
+static void add_parameter_map(uint16_t id, float* ref){
+    static uint16_t map_idx = 0u;   /* no need to set as gloabl. Parameters cannot be unmapped*/
+
+    if (map_idx > ARRAY_SIZE(rob_parameters_map)){
+        return;
+    }
+
+    rob_parameters_map[map_idx].id = id;
+    rob_parameters_map[map_idx].reference = ref;
+    map_idx++;
+}
+
+/**
+ * @brief Check for parameters update for at least 5 sec
+ * 
+ * @param robot 
+ */
+static void check_parameters_update(Mobile_Platform_t* robot){
+
+    static uint32_t prevoius_update = 0u;
+
+    uint32_t act_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
+
+    if (act_time - prevoius_update < 5000u){
+        return;
+    }
+
+    prevoius_update = act_time;
+
+    for (uint8_t idx = 0u; idx < ARRAY_SIZE(rob_parameters_map), idx++){
+        if ((rob_parameters_map[idx].id == 0u) || (rob_parameters_map[idx].reference == NULL)){
+            continue;
+        }
+
+        float value;
+        Param_Get(rob_parameters_map[idx].id, &value);
+
+        if (value != *rob_parameters_map[idx].reference){
+            *rob_parameters_map[idx].reference = value;
+        }
     }
 }
 
@@ -467,6 +518,14 @@ void Robot_Init(Mobile_Platform_t* robot){
     robot->handle->orient.actual = 0.f;
     robot->handle->current_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
 
+    add_parameter_map(KP_ID, &robot->motors[0]->pid_params.KP);
+    add_parameter_map(KP_ID, &robot->motors[1]->pid_params.KP);
+    add_parameter_map(KI_ID, &robot->motors[0]->pid_params.KI);
+    add_parameter_map(KI_ID, &robot->motors[1]->pid_params.KI);
+    add_parameter_map(KD_ID, &robot->motors[0]->pid_params.KD);
+    add_parameter_map(KD_ID, &robot->motors[1]->pid_params.KD);
+    add_parameter_map(ACCEL_SETP_ID, &robot->handle->acc_setpoint);
+
     HK_Init(robot);
 
     Robot_Stop(robot);
@@ -690,7 +749,10 @@ void Robot_Task(Mobile_Platform_t* robot) {
 
         if (cmd_on){ 
             ROB_DEBUG("RUNNING COMMAND...\r\n");
-        } 
+        } else {
+            /* no commands ongoing - there is a good time to check for motion parameters update */
+            check_parameters_update(robot);
+        }
         
     } else {
         eval_rob_state(robot);

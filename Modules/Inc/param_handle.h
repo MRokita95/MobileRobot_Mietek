@@ -39,6 +39,7 @@ typedef enum{
 #define KP_ID      1u
 #define KI_ID      2u
 #define KD_ID      3u
+#define ACCEL_SETP_ID      4u
 
 #define PARAM_SETTABLE(NAME, TYPE, DEFAULT) \
     do{ \
