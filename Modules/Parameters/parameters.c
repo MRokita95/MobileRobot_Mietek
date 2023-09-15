@@ -67,13 +67,12 @@ static param_ret_status_t handle_param(uint16_t id, void* value, bool write){
 void Param_Initialize(){
 
     /* Set Parameters ID and default values */
-    ADD_SETTABLE_PARAM(0x1F, 0x10, uint8_t);
     ADD_SETTABLE_PARAM(KP_ID, 0.06, float);
     ADD_SETTABLE_PARAM(KI_ID, 0.9, float);
     ADD_SETTABLE_PARAM(KD_ID, 0.4, float);
     ADD_SETTABLE_PARAM(ACCEL_SETP_ID, 100.0, float);
 
-    Param_SaveToFlash();    //for trial
+    //Param_SaveToFlash();    //for trial
     /*  Check if parameters are store in FLASH.
         If stored - default values will be overwritten, 
         otherwise, default values remain */

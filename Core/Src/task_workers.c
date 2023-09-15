@@ -118,7 +118,12 @@ void TasksWorkers_Init(){
       }
   }
 
+  /* WOrkers Initialization */
   Comm_Init();
+  Param_Initialize();
+  Robot_Init(&robot);
+  imu_sensor = Sensor_Init(IMU);
+  Trace_InitAccessInstances(&robot)
 }
 
 
@@ -141,7 +146,6 @@ void vTask_Communication(void const * argument){
 
 void vTask_Sensors(void const * argument) {
 
-    imu_sensor = Sensor_Init(IMU);
       
 
     TickType_t xNextWakeTime;
@@ -160,7 +164,6 @@ void vTask_Sensors(void const * argument) {
 
 void vTask_Robot(void const * argument){
 
-  Robot_Init(&robot);
 
   TickType_t xNextWakeTime;
 
