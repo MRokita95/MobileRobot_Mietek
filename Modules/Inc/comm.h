@@ -9,7 +9,9 @@
 
 #define PACKET_HEADER_UNREAD    0xAA00
 #define PACKET_HEADER_READ      0xBB99
+#define HK_DATA_HEADER          0xBBAAu
 #define TASK_FAILED_HEADER      0xABABu
+#define TRACE_DATA_HEADER       0xCCBBu
 
 typedef struct{
     uint8_t application_id;

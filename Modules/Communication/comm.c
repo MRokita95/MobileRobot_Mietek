@@ -5,7 +5,10 @@
 #include "queue.h"
 #include "commands.h"
 #include "string.h"
+#include "tracing.h"
 
+#define START_FRAME_SIGN    "{"
+#define END_FRAME_SIGN      "}"
 
 #define MAX_UART_MSG_SIZE   11u      // single message max size + 1 byte of HW control stop
 #define RX_BUFFER_SIZE      2u     // place for max messages
@@ -41,6 +44,16 @@ QueueHandle_t xRespQueue;
 
 
 
+/**
+ * @brief Trace Queue - contains robot trace info data
+ * Queue length = 1 could be enough because management task has 5 sec period, and comm Task has 500 ms
+ * and we send only 1 trace data per management task.
+ */
+#define TRACE_QUEUE_LENGTH   4u
+#define TRACE_FRAME_SIZE sizeof(trace_data_t)
+static StaticQueue_t xTraceStaticQueue;
+uint8_t trace_queue_buffer[TRACE_QUEUE_LENGTH * TRACE_FRAME_SIZE];
+QueueHandle_t xTraceQueue;
 
 /**
  * @brief Receiving buffer and data pointer
@@ -85,6 +98,9 @@ void Comm_Init(){
     xRespQueue = xQueueCreateStatic(RESP_QUEUE_LENGTH, RESP_FRAME_SIZE, resp_queue_buffer, &xRespStaticQueue);
     configASSERT(xRespQueue);
 
+    xTraceQueue = xQueueCreateStatic(TRACE_QUEUE_LENGTH, TRACE_FRAME_SIZE, trace_queue_buffer, &xTraceStaticQueue);
+    configASSERT(xTraceQueue);
+
 	Comm_Uart_Receive_Irq();
 }
 
@@ -96,8 +112,13 @@ void Comm_Task(){
 
     /* HouseKeeping data to send */
     if(xQueueReceive(xHKQueue, &message, 10u) == pdTRUE) {
-
+        uint16_t header = HK_DATA_HEADER;
+        
+        send_uart(&huart2, &(uint8_t){START_FRAME_SIGN});
+        send_uart(&huart2, &header);
         send_uart(&huart2, message);
+        send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
+        return;     /* one message per Communication Frame */
     }
 
 
@@ -107,10 +128,29 @@ void Comm_Task(){
 
         //temp solution
         uint16_t header = TASK_FAILED_HEADER;
+
+        send_uart(&huart2, &(uint8_t){START_FRAME_SIGN});
         send_uart(&huart2, &header);
         send_uart(&huart2, &task_response.task_error_code);
         send_uart(&huart2, &task_response.task_failed);
         send_uart(&huart2, &task_response.function_failed);
+        send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
+        return;     /* one message per Communication Frame */
     } 
+
+
+    trace_data_t trace_data;
+    /* Response error data to send */
+    if(xQueueReceive(xTraceQueue, &trace_data, 10u) == pdTRUE) {
+
+        //temp solution
+        uint16_t header = TRACE_DATA_HEADER;
+
+        send_uart(&huart2, &(uint8_t){START_FRAME_SIGN});
+        send_uart(&huart2, &header);
+        send_uart(&huart2, &trace_data);
+        send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
+        return;     /* one message per Communication Frame */
+    }
 }
 

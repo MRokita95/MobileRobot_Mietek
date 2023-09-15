@@ -84,7 +84,7 @@ static void send_trace_data(){
     static uint16_t data_size = 0;
     static trace_data_t* trace_ptr = NULL;
 
-    if ((data_size == 0u) && (m_tr_data_size != 0) && !m_transfer_ongoing){
+    if ((m_tr_data_size != 0) && !m_transfer_ongoing){
         m_transfer_ongoing = true;
         data_size = m_tr_data_size;
         trace_ptr = m_trace_data;
