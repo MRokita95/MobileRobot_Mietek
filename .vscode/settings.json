@@ -13,6 +13,7 @@
         "robot_app.h": "c",
         "stm32f4xx_hal.h": "c",
         "robot.h": "c",
-        "freertos.h": "c"
+        "freertos.h": "c",
+        "stdlib.h": "c"
     }
 }

@@ -26,8 +26,8 @@
 #endif
 
 /* default timeout */
-#define I2CDEV_DEFAULT_READ_TIMEOUT     HAL_MAX_DELAY
-#define I2CDEV_DEFAULT_WRITE_TIMEOUT    HAL_MAX_DELAY
+#define I2CDEV_DEFAULT_READ_TIMEOUT     10u
+#define I2CDEV_DEFAULT_WRITE_TIMEOUT    10u
 
 /********************************************
  *			PRIVATE FUNCTIONS				*

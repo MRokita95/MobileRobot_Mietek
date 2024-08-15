@@ -20,6 +20,7 @@ typedef struct {
     SemaphoreHandle_t data_access_sem;
     void* sensor_handle;
     uint16_t data_size;
+    bool init;
 } Sensor_t;
 
 

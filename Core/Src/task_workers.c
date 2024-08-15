@@ -38,6 +38,7 @@ typedef struct
 	UBaseType_t priority;
     uint16_t stack_size;
     TickType_t frequency;
+    TaskHandle_t handle;
 } Task_t;
 
 void Robot_Application1(void);
@@ -70,16 +71,16 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.task_name = "Comm Task",
 				.task_active = 1,
 				.task_function = vTask_Communication,
-				.priority = osPriorityAboveNormal,
+				.priority = osPriorityHigh,
                 .stack_size = configMINIMAL_STACK_SIZE,
                 .frequency = COMM_TASK_FREQUENCY
 		},
 
     [SENSOR_TASK] = {
 				.task_name = "Sensors Task",
-				.task_active = 1,
+				.task_active = 0,
 				.task_function = vTask_Sensors,
-				.priority = osPriorityHigh,
+				.priority = osPriorityNormal,
                 .stack_size = configMINIMAL_STACK_SIZE+125,
                 .frequency = SENSOR_TASK_FREQUENCY
 		},
@@ -88,7 +89,7 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.task_name = "Management Task",
 				.task_active = 1,
 				.task_function = vTask_Management,
-				.priority = osPriorityNormal,
+				.priority = osPriorityAboveNormal,
                 .stack_size = configMINIMAL_STACK_SIZE,
                 .frequency = MANAG_TASK_FREQUENCY
 		}
@@ -112,18 +113,20 @@ void TasksWorkers_Init(){
           Tasks[task_idx].stack_size,
           ( void * ) NULL,
           Tasks[task_idx].priority,
-          NULL );
+          Tasks[task_idx].handle );
 
         assert_param(pdPASS == TASK_OK);
       }
   }
 
+  Comm_Register_Task_Notif(Tasks[COMM_TASK].handle);
+
   /* WOrkers Initialization */
   Comm_Init();
   Param_Initialize();
   Robot_Init(&robot);
-  imu_sensor = Sensor_Init(IMU);
-  Trace_InitAccessInstances(&robot)
+  //imu_sensor = Sensor_Init(IMU);
+  Trace_InitAccessInstances(&robot);
 }
 
 
@@ -207,11 +210,8 @@ void Robot_Application1()
 	static int i = 0;
 	if (i == 0){
 		ROBOT_WAIT(2000);
-		ROBOT_MOVE_TO_POINT(200, -800, -800);
+		ROBOT_MOVE_TO_POINT(200, 150, 0);
 		ROBOT_WAIT(2000);
-		ROBOT_MOVE_TO_POINT(200, -800, -1000);
-		ROBOT_WAIT(2000);
-		ROBOT_MOVE_TO_POINT(300, 800, 1000);
 		i = 1;
 	}
 

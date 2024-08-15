@@ -91,6 +91,7 @@ void* Sensor_Init(sensors_id_t sensor){
             sensors_table[sensor].vptr = &Sensors_VTABLE[sensor];
             sensors_table[sensor].sensor_handle = (IMU_Handle_t)imu_sensor;
             sensors_table[sensor].data_size = sizeof(euler_angles_t);
+            sensors_table[sensor].init = true;
 
 
             bool cal_status = IMU_GyroCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
@@ -123,7 +124,10 @@ void Sensor_Task(){
     for (int8_t sens_idx = 0; sens_idx < SENSOR_MAX; sens_idx++){
 
     	Sensor_t *sensor = &sensors_table[sens_idx];
-    	sensor->vptr->data_update(sensor);
+
+        if(sensor->init){
+    	    sensor->vptr->data_update(sensor);
+        }
     }
 
 }
@@ -132,6 +136,8 @@ void Sensor_Task(){
 void Sensor_GetValue(sensors_id_t sensor_id, void* value){
 	//TODO add guard
 	Sensor_t *sensor = &sensors_table[sensor_id];
-	sensor->vptr->data_access(sensor, value, false);
+    if(sensor->init){
+	    sensor->vptr->data_access(sensor, value, false);
+    }
 }
 

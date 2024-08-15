@@ -1,4 +1,3 @@
-#include "robot.h"
 #include "mobile_platform.h"
 #include "main.h"
 #include "FreeRTOS.h"
@@ -175,7 +174,7 @@ static void check_parameters_update(Mobile_Platform_t* robot){
 
     prevoius_update = act_time;
 
-    for (uint8_t idx = 0u; idx < ARRAY_SIZE(rob_parameters_map), idx++){
+    for (uint8_t idx = 0u; idx < ARRAY_SIZE(rob_parameters_map); idx++){
         if ((rob_parameters_map[idx].id == 0u) || (rob_parameters_map[idx].reference == NULL)){
             continue;
         }
@@ -827,7 +826,7 @@ robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot) {
 rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot) {
 
     const uint32_t wait_time = 100; 
-    if( xSemaphoreTake(robot->handle->update_rob_data, wait_time) == pdPASS){
+    if( xSemaphoreTake(robot->handle->access_rob_data, wait_time) == pdPASS){
 
         rob_coord_t rob_coord = robot->handle->coordinares;
 
@@ -840,7 +839,7 @@ rob_coord_t Robot_GetCoord(Mobile_Platform_t* robot) {
 euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot) {
 
     const uint32_t wait_time = 100; 
-    if( xSemaphoreTake(robot->handle->update_rob_data, wait_time) == pdPASS){
+    if( xSemaphoreTake(robot->handle->access_rob_data, wait_time) == pdPASS){
 
         euler_angles_t rob_orient;
         rob_orient.pitch = robot->handle->imu_orient.pitch;

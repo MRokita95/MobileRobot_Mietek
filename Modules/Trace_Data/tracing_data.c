@@ -5,6 +5,8 @@
 
 #define TRACE_BUFFER_SIZE 200u
 
+#define COORD_TRACING
+//#define ORIENT_TRACING
 #define COORD_INCREEMENT    10
 #define ORIENT_INCREEMENT   5.f
 
@@ -31,15 +33,19 @@ static const Mobile_Platform_t* robot_instance;
 static bool pos_changed(trace_data_t new_data, trace_data_t last_data){
 
     bool changed = false;
+#if defined(COORD_TRACING)
     if ((abs(new_data.rob_pos.x_pos - last_data.rob_pos.x_pos) >= COORD_INCREEMENT) ||
         (abs(new_data.rob_pos.y_pos - last_data.rob_pos.y_pos) >= COORD_INCREEMENT)){
         changed = true;
     }
+#endif
 
+#if defined(ORIENT_TRACING)
     if ((fabs(new_data.rob_orient.pitch - last_data.rob_orient.pitch) >= ORIENT_INCREEMENT) ||
         (fabs(new_data.rob_orient.roll - last_data.rob_orient.roll) >= ORIENT_INCREEMENT)){
         changed = true;
     }
+#endif
 
     return changed;
 }
@@ -64,7 +70,7 @@ void Trace_PullData(){
 
     uint32_t curr_timestamp = xTaskGetTickCount();
 
-    if (((curr_timestamp - m_trace_handler.last_timestamp)portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint){
+    if ((curr_timestamp - m_trace_handler.last_timestamp/portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint){
         return;
     }
 
@@ -72,7 +78,7 @@ void Trace_PullData(){
     trace_data_t new_data;
     new_data.timestamp = HAL_GetTick();
     new_data.rob_pos = Robot_GetCoord(robot_instance);
-    new_data.rob_orient = Robot_GetCoord(robot_instance);
+    new_data.rob_orient = Robot_GetOrient(robot_instance);
 
     if (!pos_changed(new_data, m_trace_handler.last_data)){
         /* Data not changed enaught to insert into buffer */
@@ -125,7 +131,7 @@ void Trace_PullData(){
 
 void Trace_FlushData(trace_data_t *data, uint16_t *size){
 
-    uint32_t *buffer = m_trace_handler.last_data;
+    uint32_t *buffer = &m_trace_handler.last_data;
     trace_data_t *data_out = data;
 
     uint16_t req_buff_size1 = *size;
@@ -158,7 +164,7 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
         
         uint16_t data_idx = 0u;
         for (data_idx = 0; data_idx < req_buff_size1; data_idx++){
-            memcpy(&data_out[data_idx], &buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
+            memcpy(&data_out[data_idx], &m_trace_data_buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
 
             m_trace_handler.read_pointer++;
         }
@@ -166,7 +172,7 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
         clamp_pointer(&m_trace_handler.read_pointer);
 
         for (data_idx; data_idx < req_buff_size1 + req_buff_size2; data_idx++){
-            memcpy(&data_out[data_idx], &buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
+            memcpy(&data_out[data_idx], &m_trace_data_buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
 
             m_trace_handler.read_pointer++;
         }

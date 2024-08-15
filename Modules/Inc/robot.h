@@ -4,6 +4,8 @@
 #include "motor.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include "robot.h"
+#include "sensors_common.h"
 
 /**
  * @brief PUBLIC functions, defines and typedefs

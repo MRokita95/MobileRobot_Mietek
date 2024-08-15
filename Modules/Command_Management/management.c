@@ -15,7 +15,7 @@
 
 
 typedef enum{
-    OK = 0,
+    STS_OK = 0,
     INVALID_APP_ID,
     INVALID_FUNC_ID,
     INVALID_PARAM,
@@ -186,7 +186,7 @@ static bool deserialize_rob_command(command_type_t cmd_type, command_t* cmd, uin
 
 static task_exec_status_t send_for_execution(comm_task_frame_t* task){
 
-    task_exec_status_t status = OK;
+    task_exec_status_t status = STS_OK;
 
     switch (task->appdata.application_id)
     {
@@ -258,7 +258,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
             uint16_t par_val = 0u;  //TODO:
             param_ret_status_t param_sts = Param_Get(par_id, &par_val);
             if (param_sts == PARAM_OK){
-                status = OK;
+                status = STS_OK;
             } else {
                 status = FAILED_EXEC;
                 m_task_response.task_error_code = (uint16_t)param_sts;
@@ -334,9 +334,9 @@ void Management_Task(){
 
         for (uint16_t idx = 0; idx < COMM_FRAME_BUFF_SIZE; idx++){
 
-            if (task_buff[idx].header == PACKET_HEADER_UNREAD){
+            if (task_buff[idx].header.msg_id == PACKET_HEADER_UNREAD){
 
-                if (send_for_execution(&task_buff[idx]) != OK){
+                if (send_for_execution(&task_buff[idx]) != STS_OK){
 
                     m_task_response.task_failed = task_buff[idx].appdata.application_id;
                     m_task_response.function_failed = task_buff[idx].appdata.function_id;
@@ -344,7 +344,7 @@ void Management_Task(){
                     xQueueSend(xRespQueue, &m_task_response, 10);
                     break;
                 }
-                task_buff[idx].header = PACKET_HEADER_READ;
+                task_buff[idx].header.msg_id = PACKET_HEADER_READ;
             }
         }
 

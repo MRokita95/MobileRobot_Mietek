@@ -3,33 +3,40 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "FreeRTOS.h"
 
 #define COMM_FRAME_PARAM_SIZE   10u
 #define COMM_FRAME_BUFF_SIZE    10u     // place for max messages
 
-#define PACKET_HEADER_UNREAD    0xAA00
-#define PACKET_HEADER_READ      0xBB99
-#define HK_DATA_HEADER          0xBBAAu
-#define TASK_FAILED_HEADER      0xABABu
-#define TRACE_DATA_HEADER       0xCCBBu
+#define COMMAND_FROM_CLIENT     0x01
+#define PACKET_HEADER_UNREAD    0xAA
+#define PACKET_HEADER_READ      0xBB
+#define HK_DATA_HEADER          0x01u
+#define TASK_FAILED_HEADER      0x02u
+#define TRACE_DATA_HEADER       0x03u
+
+typedef struct{
+    uint8_t msg_id;
+    uint8_t size;
+}__attribute__((packed))header_t;
 
 typedef struct{
     uint8_t application_id;
     uint8_t function_id;
     uint8_t parameters[COMM_FRAME_PARAM_SIZE];
-} appdata_t;
+}__attribute__((packed)) appdata_t;
 
 typedef struct{
-    uint16_t header;
+    header_t header;
     appdata_t appdata;
     uint8_t data_valid;
-} comm_task_frame_t;
+}__attribute__((packed)) comm_task_frame_t;
 
 typedef struct{
     uint16_t task_error_code;
     uint16_t task_failed;
     uint16_t function_failed;
-} comm_task_response_frame_t;
+}__attribute__((packed)) comm_task_response_frame_t;
 
 
 void Comm_Task(void);

@@ -604,7 +604,7 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer, Stack
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) 
 {
-	Comm_Uart_Receive_Irq();
+	//Comm_Uart_Receive_Irq();
 }
 
 // EXTI Line13 External Interrupt ISR Handler CallBackFun
