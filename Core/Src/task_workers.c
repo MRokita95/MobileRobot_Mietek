@@ -11,7 +11,8 @@
 #include "param_handle.h"
 #include "commands.h"
 #include "tracing.h"
-
+#include "monitoring.h"
+#include "events.h"
 
 #define CALIB_CNT     100u
 #define MESSAGE_LENGTH 120u
@@ -46,8 +47,8 @@ void vTask_Robot(void const * argument);
 void vTask_Communication(void const * argument);
 void vTask_Sensors(void const * argument);
 void vTask_Management(void const * argument);
-
-
+void vTask_Monitoring(void const * argument);
+void vTask_Event(void const * argument);
 
 char message_buffer[MESSAGE_LENGTH];
 
@@ -92,6 +93,24 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.priority = osPriorityAboveNormal,
                 .stack_size = configMINIMAL_STACK_SIZE,
                 .frequency = MANAG_TASK_FREQUENCY
+		},
+
+    [MONITOR_TASK] = {
+				.task_name = "Monitor Task",
+				.task_active = 1,
+				.task_function = vTask_Monitoring,
+				.priority = osPriorityNormal,
+                .stack_size = configMINIMAL_STACK_SIZE,
+                .frequency = MONITOR_TASK_FREQUENCY
+		},
+
+    [EVENT_TASK] = {
+				.task_name = "Event Task",
+				.task_active = 1,
+				.task_function = vTask_Event,
+				.priority = osPriorityAboveNormal,
+                .stack_size = configMINIMAL_STACK_SIZE,
+                .frequency = EVENT_TASK_FREQUENCY
 		}
 };
 
@@ -119,7 +138,6 @@ void TasksWorkers_Init(){
       }
   }
 
-  Comm_Register_Task_Notif(Tasks[COMM_TASK].handle);
 
   /* WOrkers Initialization */
   Comm_Init();
@@ -127,6 +145,8 @@ void TasksWorkers_Init(){
   Robot_Init(&robot);
   //imu_sensor = Sensor_Init(IMU);
   Trace_InitAccessInstances(&robot);
+  Monitoring_Init();
+  Event_Task_Register(vTask_Event);
 }
 
 
@@ -201,6 +221,42 @@ void vTask_Management(void const * argument) {
 
 	  /* Perform trace info gathering */
       Trace_PullData();
+  }
+}
+
+
+void vTask_Monitoring(void const * argument) {
+
+      
+
+    TickType_t xNextWakeTime;
+
+    const TickType_t xBlockTime = Tasks[MONITOR_TASK_FREQUENCY].frequency/portTICK_RATE_MS;
+    xNextWakeTime = xTaskGetTickCount();
+
+    for(;;){
+
+      vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+
+      Monitoring_Execute();
+  }
+}
+
+
+void vTask_Event(void const * argument) {
+
+      
+
+    TickType_t xNextWakeTime;
+
+    const TickType_t xBlockTime = Tasks[EVENT_TASK_FREQUENCY].frequency/portTICK_RATE_MS;
+    xNextWakeTime = xTaskGetTickCount();
+
+    for(;;){
+
+      vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+
+      Event_Handle();
   }
 }
 

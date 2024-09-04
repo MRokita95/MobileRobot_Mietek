@@ -83,14 +83,8 @@ void Robot_MoveToPoint(Mobile_Platform_t* robot, int32_t speed, int32_t x_pos, i
 
 void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms);
 
-void Robot_Stop(Mobile_Platform_t* robot);
-
 void Robot_SetMode(Mobile_Platform_t* robot, robot_mode_t mode);
 
 void Robot_ManualCtrl(Mobile_Platform_t* robot, manual_ctrl_command_t ctrl);
-
-robot_status_t Robot_Status(Mobile_Platform_t* robot);
-
-robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot);
 
 #endif

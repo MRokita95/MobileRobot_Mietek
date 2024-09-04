@@ -819,7 +819,7 @@ robot_status_t Robot_Status(Mobile_Platform_t* robot) {
     return robot->handle->status;
 }
 
-robot_status_t Robot_ActiveMode(Mobile_Platform_t* robot) {
+robot_mode_t Robot_ActiveMode(Mobile_Platform_t* robot) {
     return robot->handle->mode;
 }
 
@@ -850,4 +850,8 @@ euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot) {
 
         return rob_orient;
     }
+}
+
+int32_t Robot_GetWheelSpeed(Mobile_Platform_t* robot, robot_wheel wheel){
+    return (int32_t)robot->handle->single_wheel_speed[wheel];
 }
