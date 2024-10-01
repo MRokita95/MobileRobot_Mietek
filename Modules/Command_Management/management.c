@@ -58,14 +58,27 @@ extern QueueHandle_t xRespQueue;
  * 
  */
 extern QueueHandle_t xTraceQueue;
+extern QueueHandle_t xRobDataQueue;
+
+extern Mobile_Platform_t* robot;
 
 
-static task_exec_status_t collect_robot_data(rob_data_response_t* rob_data){
+static task_exec_status_t collect_robot_data(robot_status_data_t* rob_data){
     if (rob_data == NULL){
         return INVALID_PARAM;
     }
 
-    //rob_data.robot_status = 
+    rob_data->current_state = Robot_Status(robot);
+    rob_data->active_mode = Robot_ActiveMode(robot);
+    rob_data->speed_setpoint = robot->speed_setpoint;
+    rob_data->right_wheel_speed = Robot_GetWheelSpeed(robot, RIGHT);
+    rob_data->left_wheel_speed = Robot_GetWheelSpeed(robot, LEFT);
+
+    return STS_OK;
+}
+
+static void send_robot_data(robot_status_data_t* rob_data){
+    xQueueSend(xRobDataQueue, rob_data, portMAX_DELAY);
 }
 
 
@@ -274,8 +287,9 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
     case HK_APP_ID:
     {
         /* task->appdata.function_id - not used  */
-        rob_data_response_t rob_data;
+        robot_status_data_t rob_data;
         status = collect_robot_data(&rob_data);
+        send_robot_data(&rob_data);
         break;
     }
 

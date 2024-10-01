@@ -30,19 +30,11 @@ typedef struct {
 
 
 typedef struct {
-    int16_t robot_status;
-    int16_t robot_mode;
-    int16_t actual_speed;
-    int16_t setpoint_speed;
-    int32_t actual_distance;
-    int32_t setpoint_distance;
-    rob_coord_t actual_pos;
-    rob_coord_t setpoint_pos;
-    struct rob_orient{
-        int16_t roll;
-        int16_t pitch;
-        int16_t yaw;
-    };
-} rob_data_response_t;
+    robot_status_t current_state;
+    robot_mode_t active_mode;
+    int32_t speed_setpoint;
+    int32_t right_wheel_speed;
+    int32_t left_wheel_speed;
+} __attribute__((packed)) robot_status_data_t;
 
 #endif

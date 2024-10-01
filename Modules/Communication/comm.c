@@ -6,6 +6,7 @@
 #include "commands.h"
 #include "string.h"
 #include "tracing.h"
+#include "comm_types.h"
 
 #define START_FRAME_SIGN    "{"
 #define END_FRAME_SIGN      "}"
@@ -54,6 +55,13 @@ QueueHandle_t xRespQueue;
 static StaticQueue_t xTraceStaticQueue;
 uint8_t trace_queue_buffer[TRACE_QUEUE_LENGTH * TRACE_FRAME_SIZE];
 QueueHandle_t xTraceQueue;
+
+
+#define ROBDATA_QUEUE_LENGTH   4u
+#define ROBDATA_FRAME_SIZE sizeof(robot_status_data_t)
+static StaticQueue_t xRobDataStaticQueue;
+uint8_t robdata_queue_buffer[ROBDATA_QUEUE_LENGTH * ROBDATA_FRAME_SIZE];
+QueueHandle_t xRobDataQueue;
 
 /**
  * @brief Receiving buffer and data pointer
@@ -107,6 +115,9 @@ void Comm_Init(){
 
     xTraceQueue = xQueueCreateStatic(TRACE_QUEUE_LENGTH, TRACE_FRAME_SIZE, trace_queue_buffer, &xTraceStaticQueue);
     configASSERT(xTraceQueue);
+
+    xRobDataQueue = xQueueCreateStatic(ROBDATA_QUEUE_LENGTH, ROBDATA_FRAME_SIZE, robdata_queue_buffer, &xRobDataStaticQueue);
+    configASSERT(xRobDataQueue);
 
 	//Comm_Uart_Receive_Irq();
 }
@@ -180,6 +191,23 @@ void Comm_Task(){
         HAL_UART_Transmit(&huart2, (uint8_t *)tr_message_buff, sizeof(trace_data_t)+2, 100);
         //send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
         return;     /* one message per Communication Frame */
+    }
+
+
+    static char tr_robdata_buff[sizeof(header_t)+sizeof(robot_status_data_t)+2];
+    robot_status_data_t rob_data;
+    if(xQueueReceive(xRobDataQueue, &rob_data, 10u) == pdTRUE) {
+        header_t header;
+        header.msg_id = HK_DATA_HEADER;
+        header.size = ROBDATA_FRAME_SIZE;
+
+        memcpy(tr_robdata_buff, &rob_data, sizeof(robot_status_data_t));
+        tr_message_buff[sizeof(robot_status_data_t)] = '\r';
+        tr_message_buff[sizeof(robot_status_data_t)+1] = '\n';
+
+        send_uart(&huart2, &header);
+        HAL_UART_Transmit(&huart2, (uint8_t *)tr_robdata_buff, sizeof(robot_status_data_t)+2, 100);
+        return;
     }
 }
 
