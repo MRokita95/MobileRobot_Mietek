@@ -106,12 +106,13 @@ static void read_uart_data(){
 
         portDISABLE_INTERRUPTS();
 
-        UARTDMA_GetData(&huartdma, &m_comm_buffer.header, sizeof(header_t));
-        if (m_comm_buffer.header.msg_id == COMMAND_FROM_CLIENT && m_comm_buffer.header.size >= (sizeof(appdata_t))){
-            UARTDMA_GetData(&huartdma, &m_comm_buffer.appdata, m_comm_buffer.header.size);
+        UARTDMA_GetData(&huartdma, &m_comm_buffer.header, sizeof(header_t), false);
+        //m_comm_buffer.header.size >= 2u -> apid + funcid
+        if (m_comm_buffer.header.msg_id == COMMAND_FROM_CLIENT && m_comm_buffer.header.size >= 2u){
+            UARTDMA_GetData(&huartdma, &m_comm_buffer.appdata, m_comm_buffer.header.size, true);
 
             /* only verified data could be queued */
-            if ((m_comm_buffer.appdata.application_id != 0u) && (m_comm_buffer.appdata.function_id != 0u)){
+            if ((m_comm_buffer.appdata.application_id != 0u) || (m_comm_buffer.appdata.function_id != 0u)){
 
                 m_comm_buffer.data_valid = 1;
                 m_comm_buffer.header.msg_id = PACKET_HEADER_UNREAD;
@@ -135,13 +136,14 @@ void Comm_Init(){
     xTraceQueue = xQueueCreateStatic(TRACE_QUEUE_LENGTH, TRACE_FRAME_SIZE, trace_queue_buffer, &xTraceStaticQueue);
     configASSERT(xTraceQueue);
 
+    UARTDMA_Init(&huartdma, &huart2);
 	//Comm_Uart_Receive_Irq();
 }
 
 void Comm_Task(){
 
 
-
+    read_uart_data();
     //Comm_Uart_Receive_Poll();
     
     char *message;

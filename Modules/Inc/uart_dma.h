@@ -2,6 +2,7 @@
 #define UART_DMA_H_
 
 #include "stdlib.h"
+#include "stdbool.h"
 #include "stdint.h"
 #include "stm32f4xx_hal.h"
 
@@ -26,6 +27,6 @@ void UARTDMA_UartIrqHandler(UARTDMA_HandleTypeDef *huartdma);
 void UARTDMA_DmaIrqHandler(UARTDMA_HandleTypeDef *huartdma);
 
 uint16_t UARTDMA_DataCount(UARTDMA_HandleTypeDef *huartdma);
-void UARTDMA_GetData(UARTDMA_HandleTypeDef *huartdma, uint8_t* data, uint16_t read_bytes);
+void UARTDMA_GetData(UARTDMA_HandleTypeDef *huartdma, uint8_t* data, uint16_t read_bytes, bool msg_read);
 
 #endif

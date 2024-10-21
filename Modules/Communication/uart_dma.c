@@ -77,7 +77,7 @@ uint16_t UARTDMA_DataCount(UARTDMA_HandleTypeDef *huartdma){
     return huartdma->msgCnt;
 }
 
-void UARTDMA_GetData(UARTDMA_HandleTypeDef *huartdma, uint8_t* data, uint16_t read_bytes){
+void UARTDMA_GetData(UARTDMA_HandleTypeDef *huartdma, uint8_t* data, uint16_t read_bytes, bool msg_read){
 
     const uint16_t startReadPtr = huartdma->readPtr;
     const uint16_t length = read_bytes;
@@ -90,5 +90,6 @@ void UARTDMA_GetData(UARTDMA_HandleTypeDef *huartdma, uint8_t* data, uint16_t re
             huartdma->readPtr = 0;
         }
     }
-    huartdma->msgCnt--;
+    if (msg_read)
+        huartdma->msgCnt--;
 }
