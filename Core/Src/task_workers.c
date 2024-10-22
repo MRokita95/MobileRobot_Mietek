@@ -97,7 +97,7 @@ static Task_t Tasks[TASK_NUMBERS] =
 
     [MONITOR_TASK] = {
 				.task_name = "Monitor Task",
-				.task_active = 1,
+				.task_active = 0,
 				.task_function = vTask_Monitoring,
 				.priority = osPriorityNormal,
                 .stack_size = configMINIMAL_STACK_SIZE,
@@ -106,7 +106,7 @@ static Task_t Tasks[TASK_NUMBERS] =
 
     [EVENT_TASK] = {
 				.task_name = "Event Task",
-				.task_active = 1,
+				.task_active = 0,
 				.task_function = vTask_Event,
 				.priority = osPriorityAboveNormal,
                 .stack_size = configMINIMAL_STACK_SIZE,

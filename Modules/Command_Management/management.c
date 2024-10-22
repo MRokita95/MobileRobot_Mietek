@@ -343,7 +343,7 @@ void Management_Task(){
         send_trace_data();
     }
 
-     /* HouseKeeping data to send */
+
     if(xQueueReceive(xCommQueue, &task_buff, 10u) == pdTRUE) {
 
         for (uint16_t idx = 0; idx < COMM_FRAME_BUFF_SIZE; idx++){

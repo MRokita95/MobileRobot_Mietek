@@ -8,6 +8,8 @@
 #include "tracing.h"
 #include "comm_types.h"
 
+#include "uart_dma.h"
+
 #define START_FRAME_SIGN    "{"
 #define END_FRAME_SIGN      "}"
 
@@ -16,6 +18,7 @@
 
 
 extern UART_HandleTypeDef huart2;
+extern UARTDMA_HandleTypeDef huartdma;
 extern void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
 
 
@@ -103,6 +106,31 @@ void Comm_Uart_Receive_Poll(){
     HAL_UART_Receive_IT(&huart2, rx_data, (uint16_t)MAX_UART_MSG_SIZE);
 }
 
+static void read_uart_data(){
+    comm_task_frame_t m_comm_buffer;
+    BaseType_t xHigherPriorityWoken = pdFALSE;
+
+    while (UARTDMA_DataCount(&huartdma) > 0){
+
+        portDISABLE_INTERRUPTS();
+
+        UARTDMA_GetData(&huartdma, &m_comm_buffer.header, sizeof(header_t), false);
+        //m_comm_buffer.header.size >= 2u -> apid + funcid
+        if (m_comm_buffer.header.msg_id == COMMAND_FROM_CLIENT && m_comm_buffer.header.size >= 2u){
+            UARTDMA_GetData(&huartdma, &m_comm_buffer.appdata, m_comm_buffer.header.size, true);
+
+            /* only verified data could be queued */
+            if ((m_comm_buffer.appdata.application_id != 0u) || (m_comm_buffer.appdata.function_id != 0u)){
+
+                m_comm_buffer.data_valid = 1;
+                m_comm_buffer.header.msg_id = PACKET_HEADER_UNREAD;
+                xQueueSend(xCommQueue, &m_comm_buffer, &xHigherPriorityWoken);
+            }
+        }
+
+        portENABLE_INTERRUPTS();
+    }
+}
 
 void Comm_Init(){
 
@@ -119,14 +147,15 @@ void Comm_Init(){
     xRobDataQueue = xQueueCreateStatic(ROBDATA_QUEUE_LENGTH, ROBDATA_FRAME_SIZE, robdata_queue_buffer, &xRobDataStaticQueue);
     configASSERT(xRobDataQueue);
 
+    UARTDMA_Init(&huartdma, &huart2);
 	//Comm_Uart_Receive_Irq();
 }
 
 void Comm_Task(){
 
 
-
-    Comm_Uart_Receive_Poll();
+    read_uart_data();
+    //Comm_Uart_Receive_Poll();
     
     char *message;
 
