@@ -34,7 +34,7 @@ static void auto_control_execute(void){
     }
     
     pid_input_t current_speed = Robot_GetWheelSpeed(auto_handle.robot_instance, RIGHT);
-    pid_output_t auto_handle.speed_setpoint = PID_Loop(&auto_handle.pid_handle, auto_handle.distance_current, auto_handle.distance_setpoint);
+    auto_handle.speed_setpoint = PID_Loop(&auto_handle.pid_handle, auto_handle.distance_current, auto_handle.distance_setpoint);
 
 
     Robot_SetSpeed(auto_handle.robot_instance, auto_handle.speed_setpoint);
