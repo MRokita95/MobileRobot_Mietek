@@ -60,18 +60,24 @@ void Trace_InitAccessInstances(Mobile_Platform_t *robot){
     m_trace_handler.t_diff_setpoint = TRACE_DATA_FREQUENCY/portTICK_RATE_MS;
 }
 
+void Trace_UpdateTimeoutPeriod(uint8_t timeout_s){
+    if (timeout != 0){
+        m_trace_handler.t_diff_setpoint = (uint32_t)timeout_s * (1000u /portTICK_RATE_MS);
+    }
+}
+
 static inline void clamp_pointer(uint16_t* pointer){
     if (*pointer >= TRACE_BUFFER_SIZE){
         *pointer = 0u;
     }
 }
 
-void Trace_PullData(bool force){
+void Trace_PullData(){
 
 
     uint32_t curr_timestamp = xTaskGetTickCount();
 
-    if (!force && ((curr_timestamp - m_trace_handler.last_timestamp/portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint)){
+    if ((curr_timestamp - m_trace_handler.last_timestamp/portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint){
         return;
     }
 
@@ -81,7 +87,7 @@ void Trace_PullData(bool force){
     new_data.rob_pos = Robot_GetCoord(robot_instance);
     new_data.rob_orient = Robot_GetOrient(robot_instance);
 
-    if (!pos_changed(new_data, m_trace_handler.last_data) && !force){
+    if (!pos_changed(new_data, m_trace_handler.last_data)){
         /* Data not changed enaught to insert into buffer */
         return; 
     }

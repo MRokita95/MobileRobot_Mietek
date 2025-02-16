@@ -22,6 +22,9 @@
 
 #define SENS_IMU_FNC_ID 0x01u
 
+#define TR_DATA_FNC_ID 0x01u
+#define TR_TIMEOUT_FNC_ID 0x02u
+
 typedef struct {
     uint8_t roll;
     uint8_t pitch;

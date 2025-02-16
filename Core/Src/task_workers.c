@@ -223,7 +223,7 @@ void vTask_Management(void const * argument) {
       Management_Task();
 
 	  /* Perform trace info gathering */
-      Trace_PullData(false);
+      Trace_PullData();
   }
 }
 

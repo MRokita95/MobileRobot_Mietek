@@ -31,7 +31,7 @@ void Trace_InitAccessInstances(Mobile_Platform_t *robot);
  * @note Function accesses itself proper data 
  * 
  */
-void Trace_PullData(bool force);
+void Trace_PullData();
 
 
 /**
@@ -41,5 +41,7 @@ void Trace_PullData(bool force);
 void Trace_FlushData(trace_data_t *data, uint16_t *size);
 
 uint16_t Trace_DataCnt(void);
+
+void Trace_UpdateTimeoutPeriod(uint8_t timeout_s);
 
 #endif

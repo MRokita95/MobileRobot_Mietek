@@ -38,6 +38,8 @@ trace_data_t* m_trace_data;
 uint16_t m_tr_data_size;
 bool m_transfer_ongoing;
 
+static bool m_trace_self_evaluation;
+
 /**
  * @brief Comm Frame for tasks
  * 
@@ -111,6 +113,40 @@ static void send_trace_data(){
             m_transfer_ongoing = false;
         }
     }
+}
+
+
+static task_exec_status_t handle_trace_data(uint16_t data_size, bool force){
+
+    task_exec_status_t status = OK;
+    if (data_size == 0u){
+        status = INVALID_PARAM;
+        break;
+    } else if ((m_tr_data_size != 0u) || trace_data_transfer_on()){
+        status = FAILED_EXEC;
+        break;
+    }
+
+    /* Size is OK, lets retreive data from the buffer but first allocate the buffer */
+    uint16_t avail_data = Trace_DataCnt();
+    if (avail_data > 0){
+        m_tr_data_size = data_size;
+        if (avail_data < m_tr_data_size){
+            m_tr_data_size = avail_data;
+        }
+        m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);
+        Trace_FlushData(m_trace_data, &m_tr_data_size);
+    } 
+    else if (force) {
+        m_tr_data_size = 1;
+        m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);
+        m_trace_data->timestamp = HAL_GetTick();
+        m_trace_data->rob_pos = Robot_GetCoord(&robot);
+        m_trace_data->rob_orient = Robot_GetOrient(&robot);
+    }
+    
+    send_trace_data();
+    return status;
 }
 
 
@@ -297,35 +333,17 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
     case TR_DATA_APP_ID:
     {
         /* task->appdata.function_id - not used  */
-        uint16_t data_size = 0u;
-        memcpy(&data_size, &task->appdata.parameters[0], 2u);
-
-        if (data_size == 0u){
-            status = INVALID_PARAM;
-            break;
-        } else if ((m_tr_data_size != 0u) || trace_data_transfer_on()){
-            status = FAILED_EXEC;
-            break;
+        if (task->appdata.function_id == TR_DATA_FNC_ID){
+            uint16_t data_size = 0u;
+            memcpy(&data_size, &task->appdata.parameters[0], 2u);
+            status = handle_trace_data(data_size, true);
+        } 
+        else if (task->appdata.function_id == TR_TIMEOUT_FNC_ID) {
+            uint8_t timeout = 0u;
+            memcpy(&timeout, &task->appdata.parameters[0], 1u);
+            m_trace_self_evaluation = timeout != 0;
+            Trace_UpdateTimeoutPeriod(timeout);
         }
-
-        /* Size is OK, lets retreive data from the buffer but first allocate the buffer */
-        uint16_t avail_data = Trace_DataCnt();
-        if (avail_data > 0){
-            m_tr_data_size = data_size;
-            if (avail_data < m_tr_data_size){
-                m_tr_data_size = avail_data;
-            }
-            m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);
-            Trace_FlushData(m_trace_data, &m_tr_data_size);
-        } else {
-            m_tr_data_size = 1;
-            m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);
-            m_trace_data->timestamp = HAL_GetTick();
-            m_trace_data->rob_pos = Robot_GetCoord(&robot);
-            m_trace_data->rob_orient = Robot_GetOrient(&robot);
-        }
-        
-        send_trace_data();
         break;
     }
 
@@ -354,6 +372,9 @@ void Management_Task(){
     if (trace_data_transfer_on()){
         send_trace_data();
     }
+    else if (m_trace_self_evaluation){
+        handle_trace_data(1, false);
+    }
 
 
     if(xQueueReceive(xCommQueue, &task_buff, 10u) == pdTRUE) {
@@ -373,12 +394,6 @@ void Management_Task(){
                 task_buff[idx].header.msg_id = PACKET_HEADER_READ;
             }
         }
-
-        // if (size > 0u){
-        //     for (uint16_t idx = 0; idx < size; idx++){
-        //         send_for_execution(&task_buff[idx]);
-        //     }
-        // }
     }
 
     
