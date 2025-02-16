@@ -20,6 +20,7 @@ typedef struct{
     SemaphoreHandle_t buffer_access;
     uint32_t last_timestamp;
     uint32_t t_diff_setpoint;
+    uint16_t counter;
 }trace_data_handling_t;
 
 trace_data_handling_t m_trace_handler;
@@ -65,12 +66,12 @@ static inline void clamp_pointer(uint16_t* pointer){
     }
 }
 
-void Trace_PullData(){
+void Trace_PullData(bool force){
 
 
     uint32_t curr_timestamp = xTaskGetTickCount();
 
-    if ((curr_timestamp - m_trace_handler.last_timestamp/portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint){
+    if (!force && ((curr_timestamp - m_trace_handler.last_timestamp/portTICK_RATE_MS) < m_trace_handler.t_diff_setpoint)){
         return;
     }
 
@@ -80,7 +81,7 @@ void Trace_PullData(){
     new_data.rob_pos = Robot_GetCoord(robot_instance);
     new_data.rob_orient = Robot_GetOrient(robot_instance);
 
-    if (!pos_changed(new_data, m_trace_handler.last_data)){
+    if (!pos_changed(new_data, m_trace_handler.last_data) && !force){
         /* Data not changed enaught to insert into buffer */
         return; 
     }
@@ -123,6 +124,8 @@ void Trace_PullData(){
          * write_pointer will
         */
         m_trace_handler.next_write_address = &m_trace_data_buffer[m_trace_handler.write_pointer];
+
+        m_trace_handler.counter++;
     }
 
 }
@@ -148,11 +151,11 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
     /* pointers checking */
     if (m_trace_handler.read_pointer > m_trace_handler.write_pointer){
         if ((req_buff_size2 >= m_trace_handler.write_pointer) && (req_buff_size2 != 0u)){
-            req_buff_size2 = m_trace_handler.write_pointer - 1u;
+            req_buff_size2 = m_trace_handler.write_pointer;
         }
     } else if (m_trace_handler.read_pointer < m_trace_handler.write_pointer) {
         if ((m_trace_handler.read_pointer + req_buff_size1) >= m_trace_handler.write_pointer){
-            req_buff_size1 = m_trace_handler.write_pointer - m_trace_handler.read_pointer - 1u;
+            req_buff_size1 = m_trace_handler.write_pointer - m_trace_handler.read_pointer;
         }
     } else {
         req_buff_size1 = 0u;
@@ -167,6 +170,7 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
             memcpy(&data_out[data_idx], &m_trace_data_buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
 
             m_trace_handler.read_pointer++;
+            m_trace_handler.counter--;
         }
 
         clamp_pointer(&m_trace_handler.read_pointer);
@@ -175,6 +179,7 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
             memcpy(&data_out[data_idx], &m_trace_data_buffer[m_trace_handler.read_pointer], sizeof(trace_data_t));
 
             m_trace_handler.read_pointer++;
+            m_trace_handler.counter--;
         }
 
         xSemaphoreGive(m_trace_handler.buffer_access);
@@ -182,4 +187,9 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
         *size = data_idx;
     }
 
+}
+
+
+uint16_t Trace_DataCnt(){
+    return m_trace_handler.counter;
 }

@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 #include "param_handle.h"
+#include "sensors_common.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -533,8 +534,16 @@ void Robot_Init(Mobile_Platform_t* robot){
 void Robot_UpdateMotionStatus(Mobile_Platform_t* robot){
     
     if( xSemaphoreTake(robot->handle->access_rob_data, 10) == pdPASS){
-        //IMU euler orient
-        Sensor_GetValue(IMU, &robot->handle->imu_orient);
+
+        if (Sensor_GetState(IMU)){
+            //IMU euler orient
+            Sensor_GetValue(IMU, &robot->handle->imu_orient);
+        } else {
+            //not IMU working, just mock 0
+            robot->handle->imu_orient.roll = 0;
+            robot->handle->imu_orient.pitch = 0;
+            robot->handle->imu_orient.yaw = 0;
+        }
 
         for (uint8_t idx = 0; idx < MOTORS_CNT; idx++){
             motor_handle_t* mot_handle = robot->motors[idx];

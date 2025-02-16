@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "FreeRTOS.h"
+#include "uart_dma.h"
 
 #define COMM_FRAME_PARAM_SIZE   10u
 #define COMM_FRAME_BUFF_SIZE    10u     // place for max messages
@@ -41,7 +42,7 @@ typedef struct{
 
 void Comm_Task(void);
 
-void Comm_Init(void);
+void Comm_Init(UART_HandleTypeDef* huart, UARTDMA_HandleTypeDef* huartdma);
 
 void Comm_Uart_Receive(void);
 

@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include "stm32f4xx_hal.h"
+#include "stdbool.h"
 
 #define IMU_LOG_ACTIVE
 #define IMU_LOG_FREQUENCY 1000u	// [ms]
@@ -35,5 +36,7 @@ void* Sensor_Init(sensors_id_t sensor);
 void Sensor_Task();
 
 void Sensor_GetValue(sensors_id_t sensor, void* value);
+
+bool Sensor_GetState(sensors_id_t sensor);
 
 #endif

@@ -3,7 +3,9 @@
 
 
 #include "monitoring.h"
+#include "robot.h"
 
+void RobotMon_RegisterInstance(Mobile_Platform_t* robot);
 
 bool RobotMon_Stuck_Condition(void);
 

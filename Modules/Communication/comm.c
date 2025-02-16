@@ -17,8 +17,9 @@
 #define RX_BUFFER_SIZE      2u     // place for max messages
 
 
-extern UART_HandleTypeDef huart2;
-extern UARTDMA_HandleTypeDef huartdma;
+
+static UART_HandleTypeDef* m_huart;
+static UARTDMA_HandleTypeDef* m_huartdma;
 extern void send_uart(UART_HandleTypeDef* uart_instance, void const * argument);
 
 
@@ -74,18 +75,25 @@ static uint8_t rx_buffer[MAX_UART_MSG_SIZE*RX_BUFFER_SIZE];
 static int16_t rx_write_pointer = -1;   /* after initialization is set to valid value*/
 static uint8_t rx_data[MAX_UART_MSG_SIZE];	
 
+
+inline void send_uart(UART_HandleTypeDef* uart_instance, void const * argument){
+    char* str = (char*)argument;
+	HAL_UART_Transmit(uart_instance, (uint8_t *)str, strlen(str), 100);
+}
+
 /**
  * @brief Receive bytes from uart and place into rx_buffer
  * 
  * @note Function called from interrupt (HAL_UART_RxCpltCallback)
  * 
  */
+extern UART_HandleTypeDef huart1;
 void Comm_Uart_Receive_Poll(){
 
     comm_task_frame_t m_comm_buffer;
     BaseType_t xHigherPriorityWoken = pdFALSE;
 
-    if (HAL_UART_Receive(&huart2, rx_data, (uint16_t)MAX_UART_MSG_SIZE, 500) == HAL_OK){
+    if (HAL_UART_Receive(&huart1, rx_data, (uint16_t)MAX_UART_MSG_SIZE, 500) == HAL_OK){
 
     	memcpy(&m_comm_buffer.header, rx_data, sizeof(header_t));
 
@@ -110,14 +118,14 @@ static void read_uart_data(){
     comm_task_frame_t m_comm_buffer;
     BaseType_t xHigherPriorityWoken = pdFALSE;
 
-    while (UARTDMA_DataCount(&huartdma) > 0){
+    while (UARTDMA_DataCount(m_huartdma) > 0){
 
         portDISABLE_INTERRUPTS();
 
-        UARTDMA_GetData(&huartdma, &m_comm_buffer.header, sizeof(header_t), false);
+        UARTDMA_GetData(m_huartdma, &m_comm_buffer.header, sizeof(header_t), false);
         //m_comm_buffer.header.size >= 2u -> apid + funcid
         if (m_comm_buffer.header.msg_id == COMMAND_FROM_CLIENT && m_comm_buffer.header.size >= 2u){
-            UARTDMA_GetData(&huartdma, &m_comm_buffer.appdata, m_comm_buffer.header.size, true);
+            UARTDMA_GetData(m_huartdma, &m_comm_buffer.appdata, m_comm_buffer.header.size, true);
 
             /* only verified data could be queued */
             if ((m_comm_buffer.appdata.application_id != 0u) || (m_comm_buffer.appdata.function_id != 0u)){
@@ -132,7 +140,7 @@ static void read_uart_data(){
     }
 }
 
-void Comm_Init(){
+void Comm_Init(UART_HandleTypeDef* huart, UARTDMA_HandleTypeDef* huartdma){
 
     xCommQueue = xQueueCreateStatic(COMM_QUEUE_LENGTH, COMM_FRAME_SIZE, queue_buffer, &xStaticQueue);
     configASSERT(xCommQueue);
@@ -147,7 +155,10 @@ void Comm_Init(){
     xRobDataQueue = xQueueCreateStatic(ROBDATA_QUEUE_LENGTH, ROBDATA_FRAME_SIZE, robdata_queue_buffer, &xRobDataStaticQueue);
     configASSERT(xRobDataQueue);
 
-    UARTDMA_Init(&huartdma, &huart2);
+    m_huart = huart;
+    m_huartdma = huartdma;
+
+    UARTDMA_Init(m_huartdma, m_huart);
 	//Comm_Uart_Receive_Irq();
 }
 
@@ -159,16 +170,16 @@ void Comm_Task(){
     
     char *message;
 
-    /* HouseKeeping data to send */
+    /* HouseKeeping data to send - disabled */
     if(xQueueReceive(xHKQueue, &message, 10u) == pdTRUE) {
         header_t header;
         header.msg_id = HK_DATA_HEADER;
         header.size = 0;    //using this ID, size is not relevant
         
-        //send_uart(&huart2, &(uint8_t){START_FRAME_SIGN});
-        send_uart(&huart2, &header);
-        send_uart(&huart2, message);
-        //send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
+        //send_uart(m_huart, &(uint8_t){START_FRAME_SIGN});
+        //send_uart(m_huart, &header);
+        //send_uart(m_huart, message);
+        //send_uart(m_huart, &(uint8_t){END_FRAME_SIGN});
         return;     /* one message per Communication Frame */
     }
 
@@ -182,12 +193,12 @@ void Comm_Task(){
         header.msg_id = TASK_FAILED_HEADER;
         header.size = sizeof(comm_task_response_frame_t);
 
-        send_uart(&huart2, &(uint8_t){START_FRAME_SIGN});
-        send_uart(&huart2, &header);
-        send_uart(&huart2, &task_response.task_error_code);
-        send_uart(&huart2, &task_response.task_failed);
-        send_uart(&huart2, &task_response.function_failed);
-        send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
+        //send_uart(m_huart, &(uint8_t){START_FRAME_SIGN});
+        send_uart(m_huart, &header);
+        send_uart(m_huart, &task_response.task_error_code);
+        send_uart(m_huart, &task_response.task_failed);
+        send_uart(m_huart, &task_response.function_failed);
+        //send_uart(m_huart, &(uint8_t){END_FRAME_SIGN});
         return;     /* one message per Communication Frame */
     } 
 
@@ -210,15 +221,15 @@ void Comm_Task(){
         // trace_data.rob_orient.pitch = 0;
         // trace_data.rob_orient.yaw = 0;
 
-        //send_uart(&huart2, &(uint8_t){START_FRAME_SIGN});
+        //send_uart(m_huart, &(uint8_t){START_FRAME_SIGN});
         memcpy(tr_message_buff, &trace_data, sizeof(trace_data_t));
-        tr_message_buff[sizeof(trace_data_t)] = '\r';
-        tr_message_buff[sizeof(trace_data_t)+1] = '\n';
+        //tr_message_buff[sizeof(trace_data_t)] = '\r';
+        //tr_message_buff[sizeof(trace_data_t)+1] = '\n';
 
-        send_uart(&huart2, &header);
-        //send_uart(&huart2, tr_message_buff);    //check return code???
-        HAL_UART_Transmit(&huart2, (uint8_t *)tr_message_buff, sizeof(trace_data_t)+2, 100);
-        //send_uart(&huart2, &(uint8_t){END_FRAME_SIGN});
+        send_uart(m_huart, &header);
+        //send_uart(m_huart, tr_message_buff);    //check return code???
+        HAL_UART_Transmit(m_huart, (uint8_t *)&tr_message_buff, sizeof(trace_data_t), 100);
+        //send_uart(m_huart, &(uint8_t){END_FRAME_SIGN});
         return;     /* one message per Communication Frame */
     }
 
@@ -234,8 +245,8 @@ void Comm_Task(){
         tr_message_buff[sizeof(robot_status_data_t)] = '\r';
         tr_message_buff[sizeof(robot_status_data_t)+1] = '\n';
 
-        send_uart(&huart2, &header);
-        HAL_UART_Transmit(&huart2, (uint8_t *)tr_robdata_buff, sizeof(robot_status_data_t)+2, 100);
+        send_uart(m_huart, &header);
+        HAL_UART_Transmit(m_huart, (uint8_t *)tr_robdata_buff, sizeof(robot_status_data_t), 100);
         return;
     }
 }

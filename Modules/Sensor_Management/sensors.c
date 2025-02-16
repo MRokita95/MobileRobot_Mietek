@@ -91,7 +91,6 @@ void* Sensor_Init(sensors_id_t sensor){
             sensors_table[sensor].vptr = &Sensors_VTABLE[sensor];
             sensors_table[sensor].sensor_handle = (IMU_Handle_t)imu_sensor;
             sensors_table[sensor].data_size = sizeof(euler_angles_t);
-            sensors_table[sensor].init = true;
 
 
             bool cal_status = IMU_GyroCalibration(imu_sensor, IMU_GYRO_CALIB_CNT);
@@ -110,6 +109,7 @@ void* Sensor_Init(sensors_id_t sensor){
                 //SENS_DEBUG("Gyro NOT calibrated \r\n");
             //}
 
+            sensors_table[sensor].init = cal_status;
             return imu_sensor;
         }
         break;
@@ -141,3 +141,8 @@ void Sensor_GetValue(sensors_id_t sensor_id, void* value){
     }
 }
 
+bool Sensor_GetState(sensors_id_t sensor_id){
+    Sensor_t *sensor = &sensors_table[sensor_id];
+
+    return sensor->init;
+}

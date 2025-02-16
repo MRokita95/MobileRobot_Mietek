@@ -17,7 +17,9 @@
 #define CALIB_CNT     100u
 #define MESSAGE_LENGTH 120u
 
-
+extern UARTDMA_HandleTypeDef huartdma;
+extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart1;
 
 typedef struct
 {
@@ -140,11 +142,12 @@ void TasksWorkers_Init(){
 
 
   /* WOrkers Initialization */
-  Comm_Init();
+  Comm_Init(&huart1, &huartdma);
   Param_Initialize();
   Robot_Init(&robot);
   //imu_sensor = Sensor_Init(IMU);
   Trace_InitAccessInstances(&robot);
+  Monitorig_RegisterRobot(&robot);
   Monitoring_Init();
   Event_Task_Register(vTask_Event);
 }
@@ -220,7 +223,7 @@ void vTask_Management(void const * argument) {
       Management_Task();
 
 	  /* Perform trace info gathering */
-      Trace_PullData();
+      Trace_PullData(false);
   }
 }
 

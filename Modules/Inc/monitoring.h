@@ -7,6 +7,7 @@
 
 #include "FreeRTOS.h"
 #include "events.h"
+#include "robot.h"
 
 typedef enum{
     UINT8_CHECK,
@@ -14,6 +15,11 @@ typedef enum{
     INT32_CHECK,
     FLOAT_CHECK,
 }check_type_t;
+
+typedef enum{
+    ROBOT_DEVICE,
+    IMU_DEVICE,
+} monitored_devices_t;
 
 union value
 {
@@ -45,11 +51,20 @@ typedef struct{
 
 typedef struct{
     conditional_cb condition;
+    uint8_t interval;
+    uint8_t samples;
+    void (*init)(void*);
+    void (*init2)(void*);
     action_cb action;
     event_t event_notif;
+    void* dev_instance;
+    monitored_devices_t dev_id;
 }check_action_t;
 
+
 void Monitoring_Init(void);
+
+void Monitorig_RegisterRobot(Mobile_Platform_t* robot);
 
 void Monitoring_Execute();
 

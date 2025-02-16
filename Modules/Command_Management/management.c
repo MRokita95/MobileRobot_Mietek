@@ -60,7 +60,7 @@ extern QueueHandle_t xRespQueue;
 extern QueueHandle_t xTraceQueue;
 extern QueueHandle_t xRobDataQueue;
 
-extern Mobile_Platform_t* robot;
+extern Mobile_Platform_t robot;
 
 
 static task_exec_status_t collect_robot_data(robot_status_data_t* rob_data){
@@ -68,11 +68,11 @@ static task_exec_status_t collect_robot_data(robot_status_data_t* rob_data){
         return INVALID_PARAM;
     }
 
-    rob_data->current_state = Robot_Status(robot);
-    rob_data->active_mode = Robot_ActiveMode(robot);
-    rob_data->speed_setpoint = robot->speed_setpoint;
-    rob_data->right_wheel_speed = Robot_GetWheelSpeed(robot, RIGHT);
-    rob_data->left_wheel_speed = Robot_GetWheelSpeed(robot, LEFT);
+    rob_data->current_state = Robot_Status(&robot);
+    rob_data->active_mode = Robot_ActiveMode(&robot);
+    rob_data->speed_setpoint = robot.speed_setpoint;
+    rob_data->right_wheel_speed = Robot_GetWheelSpeed(&robot, RIGHT);
+    rob_data->left_wheel_speed = Robot_GetWheelSpeed(&robot, LEFT);
 
     return STS_OK;
 }
@@ -309,10 +309,22 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         }
 
         /* Size is OK, lets retreive data from the buffer but first allocate the buffer */
-        m_tr_data_size = data_size;
-        m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);   /* maybe not all data would be needed, but the maximum must be allocated */
-        Trace_FlushData(m_trace_data, &m_tr_data_size);
-
+        uint16_t avail_data = Trace_DataCnt();
+        if (avail_data > 0){
+            m_tr_data_size = data_size;
+            if (avail_data < m_tr_data_size){
+                m_tr_data_size = avail_data;
+            }
+            m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);
+            Trace_FlushData(m_trace_data, &m_tr_data_size);
+        } else {
+            m_tr_data_size = 1;
+            m_trace_data = malloc(sizeof(trace_data_t) * m_tr_data_size);
+            m_trace_data->timestamp = HAL_GetTick();
+            m_trace_data->rob_pos = Robot_GetCoord(&robot);
+            m_trace_data->rob_orient = Robot_GetOrient(&robot);
+        }
+        
         send_trace_data();
         break;
     }
