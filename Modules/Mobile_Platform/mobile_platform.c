@@ -753,14 +753,17 @@ void Robot_Task(Mobile_Platform_t* robot) {
 
     if (Robot_Status(robot) == ROB_IDLE){
 
-        bool cmd_on = Execute_Command(robot);
+        /* no commands ongoing - there is a good time to check for motion parameters update */
+        check_parameters_update(robot);
 
-        if (cmd_on){ 
-            ROB_DEBUG("RUNNING COMMAND...\r\n");
-        } else {
-            /* no commands ongoing - there is a good time to check for motion parameters update */
-            check_parameters_update(robot);
-        }
+        // bool cmd_on = Execute_Command(robot);
+
+        // if (cmd_on){ 
+        //     ROB_DEBUG("RUNNING COMMAND...\r\n");
+        // } else {
+        //     /* no commands ongoing - there is a good time to check for motion parameters update */
+        //     check_parameters_update(robot);
+        // }
         
     } else {
         eval_rob_state(robot);

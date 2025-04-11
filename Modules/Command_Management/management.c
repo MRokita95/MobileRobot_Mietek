@@ -118,13 +118,11 @@ static void send_trace_data(){
 
 static task_exec_status_t handle_trace_data(uint16_t data_size, bool force){
 
-    task_exec_status_t status = OK;
+    task_exec_status_t status = STS_OK;
     if (data_size == 0u){
-        status = INVALID_PARAM;
-        break;
+        return INVALID_PARAM;
     } else if ((m_tr_data_size != 0u) || trace_data_transfer_on()){
-        status = FAILED_EXEC;
-        break;
+        return FAILED_EXEC;
     }
 
     /* Size is OK, lets retreive data from the buffer but first allocate the buffer */
@@ -143,6 +141,9 @@ static task_exec_status_t handle_trace_data(uint16_t data_size, bool force){
         m_trace_data->timestamp = HAL_GetTick();
         m_trace_data->rob_pos = Robot_GetCoord(&robot);
         m_trace_data->rob_orient = Robot_GetOrient(&robot);
+    } 
+    else {
+        return status;
     }
     
     send_trace_data();
@@ -151,7 +152,7 @@ static task_exec_status_t handle_trace_data(uint16_t data_size, bool force){
 
 
 
-static bool deserialize_rob_command(command_type_t cmd_type, command_t* cmd, uint8_t* params){
+static bool deserialize_rob_command(robcommand_type_t cmd_type, command_t* cmd, uint8_t* params){
     
     bool cmd_ok = false;
 
@@ -167,67 +168,73 @@ static bool deserialize_rob_command(command_type_t cmd_type, command_t* cmd, uin
     case AUTOPATH_STOP:
     case MANUAL_START:
     case MANUAL_STOP:
-        cmd->type = cmd_type;
+        cmd->payload.robcmd.type = cmd_type;
         cmd_ok = true;
         break;
     
     case RUN_FOR_TIME:
-        cmd->type = cmd_type;
-        par_size = sizeof(cmd->speed);
-        memcpy(&cmd->speed, params, par_size);
+        cmd->payload.robcmd.type = cmd_type;
+        par_size = sizeof(cmd->payload.robcmd.speed);
+        memcpy(&cmd->payload.robcmd.speed, params, par_size);
 
         params += par_size;
-        par_size = sizeof(cmd->time);
-        memcpy(&cmd->time, params, par_size);
+        par_size = sizeof(cmd->payload.robcmd.time);
+        memcpy(&cmd->payload.robcmd.time, params, par_size);
         cmd_ok = true;
         break;
 
     case RUN_FOR_DIST:
-        cmd->type = cmd_type;
-        par_size = sizeof(cmd->speed);
-        memcpy(&cmd->speed, params, par_size);
+        cmd->payload.robcmd.type = cmd_type;
+        par_size = sizeof(cmd->payload.robcmd.speed);
+        memcpy(&cmd->payload.robcmd.speed, params, par_size);
 
         params += par_size;
-        par_size = sizeof(cmd->distance);
-        memcpy(&cmd->distance, params, par_size);
+        par_size = sizeof(cmd->payload.robcmd.distance);
+        memcpy(&cmd->payload.robcmd.distance, params, par_size);
         cmd_ok = true;
         break;
 
     case RUN_TO_POINT:
-        cmd->type = cmd_type;
-        par_size = sizeof(cmd->speed);
-        memcpy(&cmd->speed, params, par_size);
+        cmd->payload.robcmd.type = cmd_type;
+        par_size = sizeof(cmd->payload.robcmd.speed);
+        memcpy(&cmd->payload.robcmd.speed, params, par_size);
 
         params += par_size;
-        par_size = sizeof(cmd->point.x_pos);
-        memcpy(&cmd->point.x_pos, params, par_size);
+        par_size = sizeof(cmd->payload.robcmd.point.x_pos);
+        memcpy(&cmd->payload.robcmd.point.x_pos, params, par_size);
 
         params += par_size;
-        par_size = sizeof(cmd->point.y_pos);
-        memcpy(&cmd->point.y_pos, params, par_size);
+        par_size = sizeof(cmd->payload.robcmd.point.y_pos);
+        memcpy(&cmd->payload.robcmd.point.y_pos, params, par_size);
         cmd_ok = true;
         break;
 
     case ROTATE:
-        cmd->type = cmd_type;
-        par_size = sizeof(cmd->speed);
-        memcpy(&cmd->speed, params, par_size);
+        cmd->payload.robcmd.type = cmd_type;
+        par_size = sizeof(cmd->payload.robcmd.speed);
+        memcpy(&cmd->payload.robcmd.speed, params, par_size);
 
         params += par_size;
-        par_size = sizeof(cmd->angle);
-        memcpy(&cmd->angle, params, par_size);
+        par_size = sizeof(cmd->payload.robcmd.angle);
+        memcpy(&cmd->payload.robcmd.angle, params, par_size);
         cmd_ok = true;
         break;
 
     case WAIT_TIME:
-        cmd->type = cmd_type;
-        par_size = sizeof(cmd->time);
-        memcpy(&cmd->time, params, par_size);
+        cmd->payload.robcmd.type = cmd_type;
+        par_size = sizeof(cmd->payload.robcmd.time);
+        memcpy(&cmd->payload.robcmd.time, params, par_size);
         cmd_ok = true;
         break;
     
     default:
         break;
+    }
+
+    if (cmd_ok){
+        cmd->payload.robcmd.robot = &robot;
+        cmd->guard = Robot_Ready;
+        cmd->dispatcher = Robot_Dispatch;
     }
 
     return cmd_ok;
@@ -241,9 +248,10 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
     {
     case ROB_APP_ID:
     {
-        command_type_t cmd_type = task->appdata.function_id;
+        robcommand_type_t cmd_type = task->appdata.function_id;
         uint8_t* parameters = &task->appdata.parameters;  //TODO
         command_t rob_cmd;
+        rob_cmd.apid = ROB_APP_ID;
         bool cmd_ok = deserialize_rob_command(cmd_type, &rob_cmd, parameters);
         if (cmd_ok){
             command_buff_status_t buff_status = command_add(rob_cmd);
@@ -396,5 +404,6 @@ void Management_Task(){
         }
     }
 
-    
+    //TODO: tmp
+    Commands_Scheduler();
 }

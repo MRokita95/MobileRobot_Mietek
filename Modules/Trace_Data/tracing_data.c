@@ -61,7 +61,7 @@ void Trace_InitAccessInstances(Mobile_Platform_t *robot){
 }
 
 void Trace_UpdateTimeoutPeriod(uint8_t timeout_s){
-    if (timeout != 0){
+    if (timeout_s != 0){
         m_trace_handler.t_diff_setpoint = (uint32_t)timeout_s * (1000u /portTICK_RATE_MS);
     }
 }

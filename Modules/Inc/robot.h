@@ -4,7 +4,6 @@
 #include "motor.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "robot.h"
 #include "sensors_common.h"
 
 /**
@@ -28,6 +27,8 @@
 #define HK_UPDATE 1000 /*ms*/
 
 typedef struct robot_internal_state_t* rob_handle_t;
+
+typedef union payload robot_payload_t;
 
 typedef struct
 {
@@ -86,5 +87,9 @@ robot_mode_t Robot_ActiveMode(Mobile_Platform_t* robot);
 int32_t Robot_GetWheelSpeed(Mobile_Platform_t* robot, robot_wheel wheel);
 
 void Robot_Stop(Mobile_Platform_t* robot);
+
+bool Robot_Ready(robot_payload_t* data);
+
+void Robot_Dispatch(robot_payload_t* data);
 
 #endif

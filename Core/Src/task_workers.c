@@ -93,7 +93,7 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.task_active = 1,
 				.task_function = vTask_Management,
 				.priority = osPriorityAboveNormal,
-                .stack_size = configMINIMAL_STACK_SIZE,
+                .stack_size = configMINIMAL_STACK_SIZE+256,
                 .frequency = MANAG_TASK_FREQUENCY
 		},
 

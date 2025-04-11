@@ -41,6 +41,7 @@ command_buff_status_t command_add(command_t command){
     **cmd = command;
     (*cmd)->id = m_ringbuff_cmd.write_idx;
     (*cmd)->status = IDLE;
+    (*cmd)->cond = BLOCKED;     //every new is blocked at beginig
 
     m_ringbuff_cmd.write_idx++;
     if (m_ringbuff_cmd.write_idx >= MAX_COMMANDS_CNT){
@@ -96,11 +97,14 @@ void command_set_status(command_status_t status){
         return;
     }
 	m_ringbuff_cmd.current_cmd->status = status;
+}
 
-    /*free the alocated memory for the executed command*/
-    if (status == DONE_OK){
-        free(m_ringbuff_cmd.current_cmd);
+void command_release(){
+    if (m_ringbuff_cmd.current_cmd == NULL){
+        return;
     }
+    /*free the alocated memory for the executed command*/
+    free(m_ringbuff_cmd.current_cmd);
 }
 
 command_status_t command_actual_status(){
@@ -111,8 +115,42 @@ command_status_t command_actual_status(){
 }
 
 command_buff_status_t command_buff_status(){
-    if (m_ringbuff_cmd.current_cmd == NULL){
+    if (m_ringbuff_cmd.current_cmd == NULL && (m_ringbuff_cmd.read_idx == m_ringbuff_cmd.write_idx)){
         return BUFF_EMPTY;
     }
     return m_ringbuff_cmd.buff_status;
+}
+
+command_cond_t command_get_next_cond(){
+    if (m_ringbuff_cmd.read_idx == -1){
+        return BLOCKED;
+    }
+    command_t **cmd  = &m_commands[m_ringbuff_cmd.read_idx];
+    if ((*cmd == NULL) && ((*cmd)->status != IDLE) ){
+        return BLOCKED;
+    }
+    return (*cmd)->cond;
+}
+
+void command_set_next_ready(){
+    if (m_ringbuff_cmd.read_idx == -1){
+        return;
+    }
+    command_t **cmd  = &m_commands[m_ringbuff_cmd.read_idx];
+    if ((*cmd == NULL) && ((*cmd)->status != IDLE) ){
+        return;
+    }
+    (*cmd)->cond = READY;
+}
+
+uint16_t command_get_count(){
+    if (m_ringbuff_cmd.write_idx > m_ringbuff_cmd.read_idx){
+        return m_ringbuff_cmd.write_idx - m_ringbuff_cmd.read_idx;
+    }
+    else if (m_ringbuff_cmd.write_idx == m_ringbuff_cmd.read_idx){
+        return 0;
+    }
+    else {
+        return MAX_COMMANDS_CNT - m_ringbuff_cmd.read_idx + m_ringbuff_cmd.write_idx;
+    }
 }
