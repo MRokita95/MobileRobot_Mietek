@@ -152,11 +152,11 @@ static task_exec_status_t handle_trace_data(uint16_t data_size, bool force){
 
 
 
-static bool deserialize_rob_command(robcommand_type_t cmd_type, command_t* cmd, uint8_t* params){
+static bool deserialize_rob_command(robcommand_type_t cmd_type, command_pcb_t* cmd, uint8_t* params){
     
     bool cmd_ok = false;
 
-    *cmd = (command_t){0};
+    *cmd = (command_pcb_t){0};
 
     size_t par_size;
 
@@ -250,7 +250,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
     {
         robcommand_type_t cmd_type = task->appdata.function_id;
         uint8_t* parameters = &task->appdata.parameters;  //TODO
-        command_t rob_cmd;
+        command_pcb_t rob_cmd;
         rob_cmd.apid = ROB_APP_ID;
         bool cmd_ok = deserialize_rob_command(cmd_type, &rob_cmd, parameters);
         if (cmd_ok){
@@ -403,7 +403,4 @@ void Management_Task(){
             }
         }
     }
-
-    //TODO: tmp
-    Commands_Scheduler();
 }

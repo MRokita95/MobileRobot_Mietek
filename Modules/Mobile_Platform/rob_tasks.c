@@ -6,11 +6,9 @@
 #include "commands.h"
 #include "application_defs.h"
 
-static command_t current_task;
+static command_pcb_t current_task;
 
-// static bool is_ready(command_t* cmd){
-//     return cmd->status != IN_PROGRESS;
-// }
+static status_update_cb status_callback;
 
 static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
 
@@ -49,7 +47,7 @@ static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
 
     case RUN_TO_POINT:
         ROB_DEBUG("RUN TO THE POINT...\r\n");
-        //Robot_MoveToPoint(robot, cmd->speed, cmd->point->x_pos, cmd->point->y_pos);
+        Robot_MoveToPoint(robot, cmd->speed, cmd->point.x_pos, cmd->point.y_pos);
         break;
 
     case ROTATE:
@@ -70,40 +68,19 @@ static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
 }
 
 
-// bool Execute_Command(Mobile_Platform_t *robot){
-
-//     command_t* rob_task = &current_task;
-
-//     if (!is_ready(rob_task) || Robot_Status(robot) == ROB_IN_PROGRESS){
-//         return false;
-//     }
-
-//     command_t cmd;
-//     command_buff_status_t buff_status = command_get_next(&cmd);
-
-//     if (buff_status == BUFF_EMPTY || cmd.status == EMPTY){
-//         return false;
-//     }
-
-//     *rob_task = cmd;
-//     rob_task->status = IN_PROGRESS;
-
-//     exec_type(robot, rob_task);
-// }
-
-
 void End_Command_Execution(Mobile_Platform_t *robot, command_status_t status){
 
-    command_set_status(status);
+    status_callback(status);
 }
 
 bool Robot_Ready(robot_payload_t* data){
     return Robot_Status(data->robcmd.robot) != ROB_IN_PROGRESS;
 }
 
-void Robot_Dispatch(robot_payload_t* data){
+void Robot_Dispatch(robot_payload_t* data, status_update_cb cb){
 
-    command_set_status(IN_PROGRESS); //tmp???
+    status_callback = cb;
+    status_callback(IN_PROGRESS);
 
     exec_type(data->robcmd.robot, &data->robcmd);
 }

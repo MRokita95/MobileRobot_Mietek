@@ -42,10 +42,15 @@ typedef enum{
     IF_EQUAL_THEN,
     IF_NOT_EQUAL_THEN,
     IF_LESS_THEN,
-    IF_BIGGER_THEN
+    IF_BIGGER_THEN,
+    VAR_ASSIGN_VALUE,
+    LOOP
 }logic_command_type;
 
+#define MAX_CUSTOM_VARS (10)
+
 typedef enum{
+    EMPTY_OP,
     POS_X,
     POS_Y,
     POS_Z,
@@ -55,7 +60,17 @@ typedef enum{
     ROB_MODE,
     TEMP,
     LEFT_WHEEL_SPEED,
-    RIGHT_WHEEL_SPEED
+    RIGHT_WHEEL_SPEED,
+    VAR0,
+    VAR1,
+    VAR2,
+    VAR3,
+    VAR4,
+    VAR5,
+    VAR6,
+    VAR7,
+    VAR8,
+    VAR9,
 }logic_operand_type;
 
 typedef enum{
@@ -86,7 +101,7 @@ typedef union{
 typedef struct{
     Mobile_Platform_t* robot;
     robcommand_type_t type;
-    uint32_t time;
+    uint16_t time;
     int16_t speed;
     rob_coord_t point;
     int32_t distance;
@@ -106,6 +121,7 @@ typedef struct{
     logic_operand_type operand;
     int32_t value;
     logic_action_type action;
+    Mobile_Platform_t* robot;
 }logic_command_t;
 
 
@@ -115,8 +131,6 @@ typedef union payload
     imu_sens_command_t imucmd;
     logic_command_t logiccmd;
 }payload_t;
-
-void Commands_Scheduler(void);
 
 
 #endif

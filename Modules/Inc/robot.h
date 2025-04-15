@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sensors_common.h"
+#include "commands_types.h"
 
 /**
  * @brief PUBLIC functions, defines and typedefs
@@ -90,6 +91,6 @@ void Robot_Stop(Mobile_Platform_t* robot);
 
 bool Robot_Ready(robot_payload_t* data);
 
-void Robot_Dispatch(robot_payload_t* data);
+void Robot_Dispatch(robot_payload_t* data, status_update_cb cb);
 
 #endif

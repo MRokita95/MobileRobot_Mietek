@@ -14,7 +14,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_MOVE_DISTANCE(setp_speed, setp_distance) \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = RUN_FOR_DIST; \
         cmd.payload.robcmd.distance = setp_distance; \
         cmd.payload.robcmd.speed = setp_speed; \
@@ -27,7 +27,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_MOVE_SPEED(setp_speed, setp_time) \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = RUN_FOR_TIME; \
         cmd.payload.robcmd.speed = setp_speed; \
         cmd.payload.robcmd.time = setp_time; \
@@ -40,7 +40,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_MOVE_TO_POINT(setp_speed, setp_X, setp_Y) \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = RUN_TO_POINT; \
         cmd.payload.robcmd.speed = setp_speed; \
         cmd.payload.robcmd.point.x_pos = setp_X; \
@@ -54,7 +54,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_ROTATE(setp_speed, setp_angle) \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = ROTATE; \
         cmd.payload.robcmd.speed = setp_speed; \
         cmd.payload.robcmd.angle = setp_angle; \
@@ -67,7 +67,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_WAIT(setp_time) \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = WAIT_TIME; \
         cmd.payload.robcmd.time = setp_time; \
         cmd.payload.robcmd.robot = &robot; \
@@ -79,7 +79,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_ON() \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = START_ROB; \
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
@@ -90,7 +90,7 @@ extern Mobile_Platform_t robot;
 
 #define ROBOT_OFF() \
     do{ \
-        command_t cmd; \
+        command_pcb_t cmd; \
         cmd.payload.robcmd.type = STOP_ROB; \
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \

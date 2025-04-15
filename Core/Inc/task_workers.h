@@ -9,17 +9,18 @@
 #define MANAG_TASK_FREQUENCY 1000U
 #define MONITOR_TASK_FREQUENCY 500U
 #define EVENT_TASK_FREQUENCY 10000U
-
+#define COMMANDS_TASK_FREQUENCY 100U
 
 #define TASK_NUMBERS 7u
 
 
-#define COMM_TASK 1u
-#define SENSOR_TASK 2u
-#define MANAGE_TASK 3u
-#define ROBOT_TASK 4u
-#define MONITOR_TASK 5u
-#define EVENT_TASK 6u
+#define COMM_TASK 0u
+#define SENSOR_TASK 1u
+#define MANAGE_TASK 2u
+#define ROBOT_TASK 3u
+#define MONITOR_TASK 4u
+#define EVENT_TASK 5u
+#define COMMANDS_TASK 6u
 
 
 #define TIMER_NUMBERS 0u

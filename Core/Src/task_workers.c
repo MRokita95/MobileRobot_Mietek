@@ -51,6 +51,7 @@ void vTask_Sensors(void const * argument);
 void vTask_Management(void const * argument);
 void vTask_Monitoring(void const * argument);
 void vTask_Event(void const * argument);
+void vTask_CommandsSched(void const * argument);
 
 char message_buffer[MESSAGE_LENGTH];
 
@@ -113,7 +114,16 @@ static Task_t Tasks[TASK_NUMBERS] =
 				.priority = osPriorityAboveNormal,
                 .stack_size = configMINIMAL_STACK_SIZE,
                 .frequency = EVENT_TASK_FREQUENCY
-		}
+		},
+
+    [COMMANDS_TASK] = {
+      .task_name = "Commands Sched Task",
+      .task_active = 1,
+      .task_function = vTask_CommandsSched,
+      .priority = osPriorityAboveNormal,
+              .stack_size = configMINIMAL_STACK_SIZE,
+              .frequency = COMMANDS_TASK_FREQUENCY
+  }
 };
 
 
@@ -145,6 +155,7 @@ void TasksWorkers_Init(){
   Comm_Init(&huart1, &huartdma);
   Param_Initialize();
   Robot_Init(&robot);
+  Commands_Scheduler_Init(Tasks[COMMANDS_TASK].handle);
   //imu_sensor = Sensor_Init(IMU);
   Trace_InitAccessInstances(&robot);
   Monitorig_RegisterRobot(&robot);
@@ -261,6 +272,22 @@ void vTask_Event(void const * argument) {
 
       Event_Handle();
   }
+}
+
+void vTask_CommandsSched(void const * argument){
+
+
+	TickType_t xNextWakeTime;
+
+	const TickType_t xBlockTime = Tasks[COMMANDS_TASK].frequency/portTICK_RATE_MS;
+	xNextWakeTime = xTaskGetTickCount();
+
+    for(;;){
+
+    	vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+      
+        Commands_Scheduler();
+    }
 }
 
 

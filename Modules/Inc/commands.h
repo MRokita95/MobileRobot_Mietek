@@ -3,41 +3,28 @@
 
 #include "robot.h"
 #include "application_defs.h"
+#include "commands_types.h"
+#include "FreeRTOS.h"
+#include "cmsis_os.h"
 
 #include <stdint.h>
 
 #define MAX_COMMANDS_CNT 100u
 
-typedef enum{
-    EMPTY = 0,
-    IDLE,
-    QUEUED,
-    IN_PROGRESS,
-    DONE_OK,
-    ERR,
-    TIMEOUT
-} command_status_t;
 
-typedef enum{
-    READY,
-    BLOCKED,
-} command_cond_t;
-
-
-typedef bool (*guard_cb)(payload_t* arg);
-typedef void (*dispatcher_cb)(payload_t* arg);
+typedef bool (*guard_cb)(payload_t* data);
+typedef void (*dispatcher_cb)(payload_t* data, status_update_cb cb);
 
 typedef struct {
     uint16_t id;
     command_status_t status;
-    command_cond_t cond;
     uint8_t apid;
     dispatcher_cb dispatcher;
     guard_cb guard;
     int32_t retval;
     bool background;    //TODO: implement
     payload_t payload;
-} command_t;
+} command_pcb_t;
 
 typedef enum{
     BUFF_EMPTY = 0,
@@ -46,26 +33,31 @@ typedef enum{
     BUFF_NOK,
 } command_buff_status_t;
 
+void command_buff_init();
 
-command_buff_status_t command_add(command_t command);
+command_buff_status_t command_add(command_pcb_t command);
 
-command_buff_status_t command_get_next(command_t* command);
+command_buff_status_t command_get_next(command_pcb_t* command);
 
 command_buff_status_t command_buff_status();
 
-command_cond_t command_get_next_cond();
+command_status_t command_get_status(command_pcb_t* command);
 
-command_status_t command_actual_status(void);
-
-void command_release(void);
+void command_release(command_pcb_t* command);
 
 void command_set_next_ready();
 
-void command_set_status(command_status_t status);
+void command_set_status(command_pcb_t* command, command_status_t status);
 
 uint16_t command_get_count(void);
 
 void Management_Task(void);
+
+void Commands_Scheduler(void);
+
+void Commands_Scheduler_Resume(void);
+
+void Commands_Scheduler_Init(TaskHandle_t xHandle);
 
 
 #endif
