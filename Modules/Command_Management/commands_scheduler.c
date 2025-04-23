@@ -1,5 +1,7 @@
 #include "commands.h"
+#include "commands_ops.h"
 #include "application_defs.h"
+#include "task.h"
 
 //todo: change start to dispatch name
 
@@ -9,7 +11,6 @@ typedef enum{
     ST_DISPATCH,
     ST_IN_PROGRESS,
     ST_FINISH,
-    ST_BLOCK,
     ST_MAX
 }SchedEnum;
 
@@ -19,7 +20,7 @@ typedef struct{
     SchedEnum state;
     SchedEnum next_state;
     state_handler_cb state_handler[ST_MAX] ;
-    command_pcb_t running_cmd;
+    command_pcb_t *running_cmd;
     uint16_t max_idx;
     TaskHandle_t taskHandle;
 }SchedState_t;
@@ -47,8 +48,8 @@ static SchedEnum init_handler(){
         return ST_FINISH;
     }
     command_buff_status_t buff_status = command_get_next(&m_scheduler.running_cmd);
-    if (buff_status == BUFF_EMPTY || command_get_status(&m_scheduler.running_cmd) == EMPTY){
-        command_release(&m_scheduler.running_cmd);
+    if (buff_status == BUFF_EMPTY || command_get_status(m_scheduler.running_cmd) == EMPTY){
+        command_release(m_scheduler.running_cmd);
         return ST_FINISH;
     }
     update_cmd_status(QUEUED);
@@ -57,8 +58,8 @@ static SchedEnum init_handler(){
 
 static SchedEnum select_handler(){
 
-    if (command_get_status(&m_scheduler.running_cmd) == QUEUED){
-        if (m_scheduler.running_cmd.guard(&m_scheduler.running_cmd.payload)){
+    if (command_get_status(m_scheduler.running_cmd) == QUEUED){
+        if (m_scheduler.running_cmd->guard(&m_scheduler.running_cmd->payload)){
             update_cmd_status(READY);
             return ST_DISPATCH;
         }
@@ -68,8 +69,8 @@ static SchedEnum select_handler(){
 
 static SchedEnum dispatch_handler(){
 
-    if (command_get_status(&m_scheduler.running_cmd) == READY){
-        m_scheduler.running_cmd.dispatcher(&m_scheduler.running_cmd.payload, update_cmd_status);
+    if (command_get_status(m_scheduler.running_cmd) == READY){
+        m_scheduler.running_cmd->dispatcher(&m_scheduler.running_cmd->payload, update_cmd_status);
         return ST_IN_PROGRESS;
     }
     return ST_FINISH;
@@ -77,7 +78,7 @@ static SchedEnum dispatch_handler(){
 
 static SchedEnum running_handler(){
 
-    command_status_t sts = command_get_status(&m_scheduler.running_cmd);
+    command_status_t sts = command_get_status(m_scheduler.running_cmd);
     if (sts == DONE_OK || sts == ERR || sts == TIMEOUT){
         return ST_FINISH;
     }
@@ -91,14 +92,12 @@ static SchedEnum finish_handler(){
     }
     if (command_get_count() == 0){
         vTaskSuspend(m_scheduler.taskHandle);
-        return ST_FINISH;   //infinite loop, but task will be blocked ST_BLOCK
     }
-
     return ST_INIT;
 }
 
 static void update_cmd_status(command_status_t status){
-    command_set_status(&m_scheduler.running_cmd, status);
+    command_set_status(m_scheduler.running_cmd, status);
 }
 
 void Commands_Scheduler(){
@@ -116,5 +115,8 @@ void Commands_Scheduler_Init(TaskHandle_t handle){
 }
 
 void Commands_Scheduler_Resume(){
-    vTaskResume(m_scheduler.taskHandle);
+    // eTaskState state = eTaskGetState(m_scheduler.taskHandle);
+    // if (state == eSuspended){
+        xTaskResumeFromISR(m_scheduler.taskHandle);
+    // }
 }

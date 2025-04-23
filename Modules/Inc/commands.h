@@ -9,8 +9,6 @@
 
 #include <stdint.h>
 
-#define MAX_COMMANDS_CNT 100u
-
 
 typedef bool (*guard_cb)(payload_t* data);
 typedef void (*dispatcher_cb)(payload_t* data, status_update_cb cb);
@@ -33,23 +31,8 @@ typedef enum{
     BUFF_NOK,
 } command_buff_status_t;
 
-void command_buff_init();
 
-command_buff_status_t command_add(command_pcb_t command);
-
-command_buff_status_t command_get_next(command_pcb_t* command);
-
-command_buff_status_t command_buff_status();
-
-command_status_t command_get_status(command_pcb_t* command);
-
-void command_release(command_pcb_t* command);
-
-void command_set_next_ready();
-
-void command_set_status(command_pcb_t* command, command_status_t status);
-
-uint16_t command_get_count(void);
+command_buff_status_t Command_New(command_pcb_t command);
 
 void Management_Task(void);
 

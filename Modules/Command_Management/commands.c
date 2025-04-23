@@ -1,6 +1,7 @@
 #include "commands.h"
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
+#include "commands_ops.h"
 
 typedef struct {
     int16_t write_idx;
@@ -10,7 +11,7 @@ typedef struct {
     SemaphoreHandle_t status_access;
 } ringbuff_cmd_t;
 
-static command_pcb_t* m_commands[MAX_COMMANDS_CNT];
+static command_pcb_t m_commands[MAX_COMMANDS_CNT];
 
 static ringbuff_cmd_t m_ringbuff_cmd = {
     .read_idx = -1,
@@ -20,8 +21,7 @@ static ringbuff_cmd_t m_ringbuff_cmd = {
 };
 
 
-command_buff_status_t command_add(command_pcb_t command){
-    command_pcb_t **cmd = m_commands;
+command_buff_status_t Command_New(command_pcb_t command){
 
     m_ringbuff_cmd.buff_status = BUFF_OK;
 
@@ -29,21 +29,19 @@ command_buff_status_t command_add(command_pcb_t command){
         m_ringbuff_cmd.write_idx = 0;
     }
 
-    cmd += m_ringbuff_cmd.write_idx;
+    command_pcb_t *cmd = &m_commands[m_ringbuff_cmd.write_idx];
 
-    if ((*cmd)->status == IN_PROGRESS && *cmd != NULL) {
+    if ((cmd)->status == IN_PROGRESS && cmd != NULL) {
         m_ringbuff_cmd.buff_status = BUFF_FULL;
         return m_ringbuff_cmd.buff_status;
     }
 
-    /*allocate memory for the command*/
-    *cmd = malloc(sizeof(command_pcb_t));
     if (cmd == NULL){
         return BUFF_NOK;
     }
-    **cmd = command;
-    (*cmd)->id = m_ringbuff_cmd.write_idx;
-    (*cmd)->status = IDLE;
+    *cmd = command;
+    (cmd)->id = m_ringbuff_cmd.write_idx;
+    (cmd)->status = IDLE;
 
     m_ringbuff_cmd.write_idx++;
     if (m_ringbuff_cmd.write_idx >= MAX_COMMANDS_CNT){
@@ -57,8 +55,8 @@ command_buff_status_t command_add(command_pcb_t command){
     return m_ringbuff_cmd.buff_status;
 }
 
-command_buff_status_t command_get_next(command_pcb_t* next_command){
-    //command_pcb_t **cmd = m_commands;
+command_buff_status_t command_get_next(command_pcb_t** next_command){
+    //command_pcb_t *cmd = m_commands;
 
     if (m_ringbuff_cmd.read_idx == -1 && m_ringbuff_cmd.write_idx == -1){
         return BUFF_EMPTY;
@@ -72,24 +70,24 @@ command_buff_status_t command_get_next(command_pcb_t* next_command){
         m_ringbuff_cmd.read_idx = 0;
     }
 
-    command_pcb_t **cmd  = &m_commands[m_ringbuff_cmd.read_idx];
+    command_pcb_t *cmd  = &m_commands[m_ringbuff_cmd.read_idx];
 
-    if ((*cmd)->status == EMPTY || *cmd == NULL) {
+    if ((cmd)->status == EMPTY || cmd == NULL) {
         return BUFF_EMPTY;
     }
-    else if ((*cmd)->status != IDLE){
+    else if ((cmd)->status != IDLE){
         m_ringbuff_cmd.buff_status = BUFF_FULL;
         return BUFF_FULL;
     }
+
+    *next_command = &m_commands[m_ringbuff_cmd.read_idx];
 
     m_ringbuff_cmd.read_idx++;
     if (m_ringbuff_cmd.read_idx >= MAX_COMMANDS_CNT){
         m_ringbuff_cmd.read_idx = -1;
     }
 
-    m_ringbuff_cmd.current_cmd = *cmd;
-
-    *next_command = **cmd;
+    m_ringbuff_cmd.current_cmd = cmd;
 
     return m_ringbuff_cmd.buff_status;
 }
@@ -104,7 +102,7 @@ void command_set_status(command_pcb_t* command, command_status_t status){
 
 void command_release(command_pcb_t* command){
     /*free the alocated memory for the executed command*/
-    free(command);
+    command_set_status(command, EMPTY);
 }
 
 command_status_t command_get_status(command_pcb_t* command){
@@ -128,11 +126,11 @@ void command_set_next_ready(){
     if (m_ringbuff_cmd.read_idx == -1){
         return;
     }
-    command_pcb_t **cmd  = &m_commands[m_ringbuff_cmd.read_idx];
-    if ((*cmd == NULL) || ((*cmd)->status != IDLE) ){
+    command_pcb_t *cmd  = &m_commands[m_ringbuff_cmd.read_idx];
+    if ((cmd == NULL) || ((cmd)->status != IDLE) ){
         return;
     }
-    command_set_status(*cmd, READY);
+    command_set_status(cmd, READY);
 }
 
 uint16_t command_get_count(){

@@ -144,7 +144,7 @@ void TasksWorkers_Init(){
           Tasks[task_idx].stack_size,
           ( void * ) NULL,
           Tasks[task_idx].priority,
-          Tasks[task_idx].handle );
+          &Tasks[task_idx].handle );
 
         assert_param(pdPASS == TASK_OK);
       }
@@ -296,8 +296,9 @@ void Robot_Application1()
 	static int i = 0;
 	if (i == 0){
 		ROBOT_WAIT(2000);
-		ROBOT_MOVE_TO_POINT(200, 150, 0);
+		ROBOT_MOVE_SPEED(200, 150);
 		ROBOT_WAIT(2000);
+    Commands_Scheduler_Resume();
 		i = 1;
 	}
 

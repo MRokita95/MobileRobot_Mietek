@@ -21,7 +21,7 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.robot = robot; \
         cmd.payload.robcmd.guard = Robot_Ready; \
         cmd.payload.robcmd.dispatch = Robot_Dispatch; \
-        command_add(cmd); \
+        Command_New(cmd); \
     }while(0)
 
 
@@ -33,8 +33,8 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.time = setp_time; \
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
-        cmd.dispatch = Robot_Dispatch; \
-        command_add(cmd); \
+        cmd.dispatcher = Robot_Dispatch; \
+        Command_New(cmd); \
     }while(0)
 
 
@@ -48,7 +48,7 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
         cmd.dispatcher = Robot_Dispatch; \
-        command_add(cmd); \
+        Command_New(cmd); \
     }while(0)
 
 
@@ -61,7 +61,7 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
         cmd.dispatcher = Robot_Dispatch; \
-        command_add(cmd); \
+        Command_New(cmd); \
     }while(0)
 
 
@@ -73,7 +73,7 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
         cmd.dispatcher = Robot_Dispatch; \
-        command_add(cmd); \
+        Command_New(cmd); \
     }while(0)
 
 
@@ -84,7 +84,7 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
         cmd.dispatcher = Robot_Dispatch; \
-        command_add(cmd); \
+        Command_New(cmd); \
     }while(0)
 
 
@@ -95,7 +95,7 @@ extern Mobile_Platform_t robot;
         cmd.payload.robcmd.robot = &robot; \
         cmd.guard = Robot_Ready; \
         cmd.dispatcher = Robot_Dispatch; \
-        command_add(cmd); \
+        Command_New(cmd); \
     }while(0)
 
 #endif
