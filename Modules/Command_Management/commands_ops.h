@@ -3,11 +3,13 @@
 
 #include "commands.h"
 
-#define MAX_COMMANDS_CNT 100u
+#define MAX_NORM_COMMANDS_CNT 100u
+#define MAX_HIGH_COMMANDS_CNT 10u
+#define MAX_CRIT_COMMANDS_CNT 5u
 
 void command_buff_init();
 
-command_buff_status_t command_get_next(command_pcb_t** command);
+command_buff_status_t command_get_next(command_pcb_t** command, command_severity_t severity);
 
 command_buff_status_t command_buff_status();
 
@@ -19,7 +21,7 @@ void command_set_next_ready();
 
 void command_set_status(command_pcb_t* command, command_status_t status);
 
-uint16_t command_get_count(void);
+uint16_t command_get_count(command_severity_t severity_queue);
 
 
 #endif

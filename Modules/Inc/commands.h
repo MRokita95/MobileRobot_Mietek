@@ -13,14 +13,23 @@
 typedef bool (*guard_cb)(payload_t* data);
 typedef void (*dispatcher_cb)(payload_t* data, status_update_cb cb);
 
+typedef enum {
+    NORMAL_SEVERITY,
+    HIGH_SEVERITY,
+    CRITICAL_SEVERITY,
+    MAX_SEVERITY
+} command_severity_t;
+
 typedef struct {
     uint16_t id;
     command_status_t status;
+    command_severity_t severity;
     uint8_t apid;
     dispatcher_cb dispatcher;
     guard_cb guard;
     int32_t retval;
-    bool background;    //TODO: implement
+    uint16_t timeout;   //TODO: implement
+    bool background;    //TODO: implement???
     payload_t payload;
 } command_pcb_t;
 
@@ -32,7 +41,8 @@ typedef enum{
 } command_buff_status_t;
 
 
-command_buff_status_t Command_New(command_pcb_t command);
+
+command_buff_status_t Command_New(command_pcb_t command, command_severity_t severity);
 
 void Management_Task(void);
 

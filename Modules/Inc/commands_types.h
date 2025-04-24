@@ -9,7 +9,8 @@ typedef enum{
     IN_PROGRESS,
     DONE_OK,
     ERR,
-    TIMEOUT
+    TIMEOUT,
+    INTERRUPTED
 } command_status_t;
 
 typedef void (*status_update_cb)(command_status_t status);

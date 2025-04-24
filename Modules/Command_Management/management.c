@@ -254,7 +254,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         rob_cmd.apid = ROB_APP_ID;
         bool cmd_ok = deserialize_rob_command(cmd_type, &rob_cmd, parameters);
         if (cmd_ok){
-            command_buff_status_t buff_status = Command_New(rob_cmd);
+            command_buff_status_t buff_status = Command_New(rob_cmd, NORMAL_SEVERITY);
 
             if (buff_status != BUFF_OK){
                 status = FAILED_EXEC;
