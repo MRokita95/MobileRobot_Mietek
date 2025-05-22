@@ -11,7 +11,7 @@
 #include "cmsis_os.h"
 #include "queue.h"
 #include "tracing.h"
-
+#include "logic_executor.h"
 
 
 typedef enum{
@@ -41,6 +41,14 @@ bool m_transfer_ongoing;
 static bool m_trace_self_evaluation;
 
 /**
+ * @brief Hausekeeping robot handing data
+ * 
+ */
+static bool m_hk_self_evaluation;
+static uint8_t m_hk_perdiod;
+static uint32_t m_hk_prev_update;
+
+/**
  * @brief Comm Frame for tasks
  * 
  */
@@ -65,22 +73,23 @@ extern QueueHandle_t xRobDataQueue;
 extern Mobile_Platform_t robot;
 
 
-static task_exec_status_t collect_robot_data(robot_status_data_t* rob_data){
-    if (rob_data == NULL){
+static task_exec_status_t collect_hk_data(hk_status_data_t* data){
+    if (data == NULL){
         return INVALID_PARAM;
     }
 
-    rob_data->current_state = Robot_Status(&robot);
-    rob_data->active_mode = Robot_ActiveMode(&robot);
-    rob_data->speed_setpoint = robot.speed_setpoint;
-    rob_data->right_wheel_speed = Robot_GetWheelSpeed(&robot, RIGHT);
-    rob_data->left_wheel_speed = Robot_GetWheelSpeed(&robot, LEFT);
+    data->current_state = Robot_Status(&robot);
+    data->active_mode = Robot_ActiveMode(&robot);
+    data->speed_setpoint = robot.speed_setpoint;
+    data->right_wheel_speed = Robot_GetWheelSpeed(&robot, RIGHT);
+    data->left_wheel_speed = Robot_GetWheelSpeed(&robot, LEFT);
+    data->imu_status = Sensor_GetState(IMU);
 
     return STS_OK;
 }
 
-static void send_robot_data(robot_status_data_t* rob_data){
-    xQueueSend(xRobDataQueue, rob_data, portMAX_DELAY);
+static void send_hk_data(hk_status_data_t* data){
+    xQueueSend(xRobDataQueue, data, portMAX_DELAY);
 }
 
 
@@ -88,6 +97,14 @@ static inline bool trace_data_transfer_on(){
     return m_transfer_ongoing;
 }
 
+static task_exec_status_t handle_hk_data(){
+    hk_status_data_t data;
+    task_exec_status_t status = collect_hk_data(&data);
+    if (STS_OK == status){
+        send_hk_data(&data);
+    }
+    return status;
+}
 
 /**
  * @brief Send trace data to related queue
@@ -331,10 +348,14 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
     case HK_APP_ID:
     {
         /* task->appdata.function_id - not used  */
-        robot_status_data_t rob_data;
-        status = collect_robot_data(&rob_data);
-        send_robot_data(&rob_data);
-        break;
+        if (task->appdata.function_id == HK_DATA_FNC_ID){
+            status = handle_hk_data();
+            break;
+        } else if (task->appdata.function_id == HK_TIMEOUT_FNC_ID) {
+            memcpy(&m_hk_perdiod, &task->appdata.parameters[0], 1u);
+            m_hk_self_evaluation = m_hk_perdiod != 0;
+            break;
+        }
     }
 
 
@@ -355,7 +376,45 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         break;
     }
 
+    case LOGIC_APP_ID:
+    {
+        command_pcb_t command;
+        command.payload.logiccmd.type = task->appdata.function_id;
+        command.payload.logiccmd.operand = task->appdata.parameters[0];
+        memcpy(&command.payload.logiccmd.value,  &task->appdata.parameters[1], 4);
+        command.payload.logiccmd.action = task->appdata.parameters[5];
+        command.apid = LOGIC_APP_ID;
+        command.dispatcher = LogicExecutor_Dispatch;
+        command.guard = LogicExecutor_Ready;
+        command_buff_status_t buff_status = Command_New(command, NORMAL_SEVERITY);
+        if (buff_status != BUFF_OK){
+            status = FAILED_EXEC;
+            m_task_response.task_error_code = (uint16_t)buff_status;
+        }
+        break;
+    }
 
+    
+    case SENS_APP_ID:
+    {
+        command_pcb_t command;
+        command.payload.senscmd.type = task->appdata.function_id;
+        command.payload.senscmd.sensor = IMU;   //for now
+        if (command.payload.senscmd.type == CALIBRATE){
+            memcpy(&command.payload.senscmd.calibration_steps,  &task->appdata.parameters[0], 2);
+        } else if (command.payload.senscmd.type == SET_MODE){
+            command.payload.senscmd.mode = task->appdata.parameters[0];
+        }
+        command.apid = SENS_APP_ID;
+        command.dispatcher = Sensor_Dispatch;
+        command.guard = Sensor_Ready;
+        command_buff_status_t buff_status = Command_New(command, NORMAL_SEVERITY);
+        if (buff_status != BUFF_OK){
+            status = FAILED_EXEC;
+            m_task_response.task_error_code = (uint16_t)buff_status;
+        }
+        break;
+    }
 
     
     default:
@@ -382,6 +441,15 @@ void Management_Task(){
     }
     else if (m_trace_self_evaluation){
         handle_trace_data(1, false);
+    }
+
+    if (m_hk_self_evaluation){
+        uint32_t timestamp = xTaskGetTickCount();
+        if ((timestamp - m_hk_prev_update/portTICK_RATE_MS) >= (uint32_t)m_hk_perdiod){
+            if (STS_OK == handle_hk_data()){
+                m_hk_prev_update = timestamp;
+            }
+        }
     }
 
 

@@ -44,4 +44,6 @@ uint16_t Trace_DataCnt(void);
 
 void Trace_UpdateTimeoutPeriod(uint8_t timeout_s);
 
+void Trace_ResetQueue(void);
+
 #endif

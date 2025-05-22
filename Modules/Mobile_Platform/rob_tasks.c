@@ -8,7 +8,7 @@
 
 static command_pcb_t current_task;
 
-static status_update_cb status_callback;
+static status_notif_cb status_notif;
 
 static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
 
@@ -70,17 +70,17 @@ static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
 
 void End_Command_Execution(Mobile_Platform_t *robot, command_status_t status){
 
-    status_callback(status);
+    status_notif(status, 0);
 }
 
 bool Robot_Ready(robot_payload_t* data){
     return Robot_Status(data->robcmd.robot) != ROB_IN_PROGRESS;
 }
 
-void Robot_Dispatch(robot_payload_t* data, status_update_cb cb){
+void Robot_Dispatch(robot_payload_t* data, status_notif_cb cb){
 
-    status_callback = cb;
-    status_callback(IN_PROGRESS);
+    status_notif = cb;
+    status_notif(IN_PROGRESS, 0);
 
     exec_type(data->robcmd.robot, &data->robcmd);
 }

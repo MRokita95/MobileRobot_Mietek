@@ -7,6 +7,6 @@ void RobotReact_RegisterInstance(Mobile_Platform_t* robot){
     m_robot = robot;
 }
 
-void RobotReact_Stop(uint8_t* param, uint16_t size){
+void RobotReact_Stop(void){
     Robot_Stop(m_robot);
 }

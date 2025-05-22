@@ -91,6 +91,6 @@ void Robot_Stop(Mobile_Platform_t* robot);
 
 bool Robot_Ready(robot_payload_t* data);
 
-void Robot_Dispatch(robot_payload_t* data, status_update_cb cb);
+void Robot_Dispatch(robot_payload_t* data, status_notif_cb cb);
 
 #endif

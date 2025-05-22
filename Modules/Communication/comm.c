@@ -62,7 +62,7 @@ QueueHandle_t xTraceQueue;
 
 
 #define ROBDATA_QUEUE_LENGTH   4u
-#define ROBDATA_FRAME_SIZE sizeof(robot_status_data_t)
+#define ROBDATA_FRAME_SIZE sizeof(hk_status_data_t)
 static StaticQueue_t xRobDataStaticQueue;
 uint8_t robdata_queue_buffer[ROBDATA_QUEUE_LENGTH * ROBDATA_FRAME_SIZE];
 QueueHandle_t xRobDataQueue;
@@ -234,19 +234,19 @@ void Comm_Task(){
     }
 
 
-    static char tr_robdata_buff[sizeof(header_t)+sizeof(robot_status_data_t)+2];
-    robot_status_data_t rob_data;
+    static char tr_robdata_buff[sizeof(header_t)+sizeof(hk_status_data_t)+2];
+    hk_status_data_t rob_data;
     if(xQueueReceive(xRobDataQueue, &rob_data, 10u) == pdTRUE) {
         header_t header;
         header.msg_id = HK_DATA_HEADER;
         header.size = ROBDATA_FRAME_SIZE;
 
-        memcpy(tr_robdata_buff, &rob_data, sizeof(robot_status_data_t));
-        tr_message_buff[sizeof(robot_status_data_t)] = '\r';
-        tr_message_buff[sizeof(robot_status_data_t)+1] = '\n';
+        memcpy(tr_robdata_buff, &rob_data, sizeof(hk_status_data_t));
+        tr_message_buff[sizeof(hk_status_data_t)] = '\r';
+        tr_message_buff[sizeof(hk_status_data_t)+1] = '\n';
 
         send_uart(m_huart, &header);
-        HAL_UART_Transmit(m_huart, (uint8_t *)tr_robdata_buff, sizeof(robot_status_data_t), 100);
+        HAL_UART_Transmit(m_huart, (uint8_t *)tr_robdata_buff, sizeof(hk_status_data_t), 100);
         return;
     }
 }

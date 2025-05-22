@@ -11,6 +11,7 @@ typedef struct {
     command_pcb_t* current_cmd;
     command_buff_status_t buff_status;
     SemaphoreHandle_t status_access;
+    queue_notif_cb incoming_notif;
 } ringbuff_cmd_t;
 
 static command_pcb_t m_normal_commands[MAX_NORM_COMMANDS_CNT];
@@ -48,6 +49,31 @@ static ringbuff_cmd_t m_ringbuff_cmd[MAX_SEVERITY] =
     },
 };
 
+void Command_ResetQueue(command_severity_t severity){
+    if (severity >= MAX_SEVERITY){
+        return BUFF_NOK;
+    }
+
+    ringbuff_cmd_t* ringbuff = &m_ringbuff_cmd[severity];
+
+    if (ringbuff->read_idx == -1){
+        ringbuff->read_idx = 0;
+    }
+
+    if (ringbuff->read_idx > ringbuff->write_idx){
+        for (uint16_t idx = ringbuff->read_idx; idx < ringbuff->max_idx; idx++){
+            ringbuff->queue[idx].status = EMPTY;
+        }
+        ringbuff->read_idx = 0;
+    }
+
+    if (ringbuff->read_idx < ringbuff->write_idx){
+        for (; ringbuff->read_idx < ringbuff->write_idx; ringbuff->read_idx++){
+            ringbuff->queue[ringbuff->read_idx].status = EMPTY;
+        }
+    }
+
+}
 
 command_buff_status_t Command_New(command_pcb_t command, command_severity_t severity){
 
@@ -77,6 +103,10 @@ command_buff_status_t Command_New(command_pcb_t command, command_severity_t seve
     (cmd)->severity = severity;
     (cmd)->id = ringbuff->write_idx;
     (cmd)->status = IDLE;
+
+    if (ringbuff->incoming_notif != NULL){
+        ringbuff->incoming_notif();
+    }
 
     ringbuff->write_idx++;
     if (ringbuff->write_idx >= ringbuff->max_idx){
@@ -210,6 +240,10 @@ uint16_t command_get_count(command_severity_t severity){
     else {
         return ringbuff->max_idx - read_idx + write_idx;
     }
+}
+
+void command_add_incoming_notif(command_severity_t severity, queue_notif_cb cb) {
+    m_ringbuff_cmd[severity].incoming_notif = cb;
 }
 
 void command_buff_init(){

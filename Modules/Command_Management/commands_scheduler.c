@@ -4,6 +4,7 @@
 #include "task.h"
 #include "timers.h"
 
+#define NOTIF_VALUE 1u
 
 typedef enum{
     ST_INIT,
@@ -31,8 +32,9 @@ static SchedEnum select_handler(void);
 static SchedEnum dispatch_handler(void);
 static SchedEnum running_handler(void);
 static SchedEnum finish_handler(void);
-static void update_cmd_status(command_status_t status);
+static void command_status_notif(command_status_t status, int32_t retval);
 static void timeoutCallback(TimerHandle_t timer);
+static void sendNotification();
 
 static SchedState_t m_scheduler = {
     .state = ST_INIT,
@@ -66,7 +68,7 @@ static SchedEnum init_handler(){
         command_release(m_scheduler.running_cmd);
         return ST_FINISH;
     }
-    update_cmd_status(QUEUED);
+    command_status_notif(QUEUED, 0);
     return ST_SELECTION;
 }
 
@@ -74,11 +76,11 @@ static SchedEnum select_handler(){
 
     if (command_get_status(m_scheduler.running_cmd) == QUEUED){
         if (m_scheduler.running_cmd->guard(&m_scheduler.running_cmd->payload)){
-            update_cmd_status(READY);
+            command_status_notif(READY, 0);
             if (m_scheduler.running_cmd->timeout == 0){
                 m_scheduler.running_cmd->timeout = 125; //because
             }
-            xTimerChangePeriod(m_scheduler.timerHandle, m_scheduler.running_cmd->timeout, 0);
+            //xTimerChangePeriod(m_scheduler.timerHandle, m_scheduler.running_cmd->timeout, 0);
             return ST_DISPATCH;
         }
     }
@@ -88,8 +90,8 @@ static SchedEnum select_handler(){
 static SchedEnum dispatch_handler(){
 
     if (command_get_status(m_scheduler.running_cmd) == READY){
-        m_scheduler.running_cmd->dispatcher(&m_scheduler.running_cmd->payload, update_cmd_status);
-        xTimerStart(m_scheduler.timerHandle, 0);
+        m_scheduler.running_cmd->dispatcher(&m_scheduler.running_cmd->payload, command_status_notif);
+        //xTimerStart(m_scheduler.timerHandle, 0);
         return ST_IN_PROGRESS;
     }
     return ST_FINISH;
@@ -97,23 +99,21 @@ static SchedEnum dispatch_handler(){
 
 static SchedEnum running_handler(){
 
-    uint16_t counts;
-    if (check_queues(&counts) == CRITICAL_SEVERITY){
-        update_cmd_status(INTERRUPTED);
-        xTimerStop(m_scheduler.timerHandle, 0);
-        return ST_FINISH;   //cleanup first
+    if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(m_scheduler.running_cmd->timeout)) == NOTIF_VALUE){
+        uint16_t counts;
+        if (check_queues(&counts) == CRITICAL_SEVERITY){
+            command_status_notif(INTERRUPTED, 0);
+        }
+    } else {
+        command_status_notif(TIMEOUT, 0);   //instead of timer?
     }
-
-    command_status_t sts = command_get_status(m_scheduler.running_cmd);
-    if (sts == DONE_OK || sts == ERR || sts == TIMEOUT){
-        xTimerStop(m_scheduler.timerHandle, 0);
-        return ST_FINISH;
-    }
-    return ST_IN_PROGRESS;
+    //xTimerStop(m_scheduler.timerHandle, 0);
+    return ST_FINISH;
 }
 
 static SchedEnum finish_handler(){
 
+    //Should I do sth with retval???
     if (m_scheduler.max_idx != 0){
         command_release(m_scheduler.running_cmd);
     }
@@ -124,13 +124,21 @@ static SchedEnum finish_handler(){
     return ST_INIT;
 }
 
-static void update_cmd_status(command_status_t status){
+static void command_status_notif(command_status_t status, int32_t retval){
     command_set_status(m_scheduler.running_cmd, status);
+    if (status == DONE_OK || status == ERR){
+        m_scheduler.running_cmd->retval = retval;
+        sendNotification();
+    }
 }
 
 static void timeoutCallback(TimerHandle_t timer){
-    update_cmd_status(TIMEOUT);
+    command_status_notif(TIMEOUT, 0);
 
+}
+
+static void sendNotification(){
+    xTaskNotify(m_scheduler.taskHandle, NOTIF_VALUE, eSetValueWithOverwrite);
 }
 
 void Commands_Scheduler(){
@@ -144,8 +152,10 @@ void Commands_Scheduler_Init(TaskHandle_t handle){
 
     command_buff_init();
 
+    command_add_incoming_notif(CRITICAL_SEVERITY, sendNotification);
+
     m_scheduler.taskHandle = handle;
-    m_scheduler.timerHandle = xTimerCreate("CommandTimeout", 100, pdFALSE, ( void * ) 0, timeoutCallback);
+    //m_scheduler.timerHandle = xTimerCreate("CommandTimeout", 100, pdFALSE, ( void * ) 0, timeoutCallback);
 }
 
 void Commands_Scheduler_Resume(){

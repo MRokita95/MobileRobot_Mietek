@@ -4,10 +4,23 @@
 #include <stdlib.h>
 #include "stm32f4xx_hal.h"
 #include "stdbool.h"
+#include "commands_types.h"
 
 #define IMU_LOG_ACTIVE
 #define IMU_LOG_FREQUENCY 1000u	// [ms]
 
+typedef enum{
+    SENSOR_ENABLE,
+    SENSOR_DISABLE
+}sensor_state_t;
+
+typedef enum{
+    SENSOR_DISABLED,
+    SENSOR_UNCALIBRATED,
+    SENSOR_WORKING
+}sensor_status_t;
+
+typedef union payload sensor_payload_t;
 
 typedef enum{
 	IMU = 0,
@@ -35,8 +48,14 @@ void* Sensor_Init(sensors_id_t sensor);
 
 void Sensor_Task();
 
+void Sensor_SetState(sensors_id_t sensor, sensor_state_t state);
+
 void Sensor_GetValue(sensors_id_t sensor, void* value);
 
-bool Sensor_GetState(sensors_id_t sensor);
+sensor_status_t Sensor_GetState(sensors_id_t sensor);
+
+bool Sensor_Ready(sensor_payload_t* data);
+
+void Sensor_Dispatch(sensor_payload_t* data, status_notif_cb cb);
 
 #endif

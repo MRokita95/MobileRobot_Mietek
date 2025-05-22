@@ -8,7 +8,7 @@
 #define ROBOT_APP_ID    0x10u
 #define PARAM_APP_ID    0x11u
 #define MEMORY_APP_ID   0x12u
-#define IMU_SENSOR_APP_ID 0x13u
+#define SENSOR_APP_ID   0x13u
 #define HK_APP_ID       0x14u
 #define LOGIC_APP_ID    0x20u
 
@@ -35,8 +35,9 @@ typedef enum{
     GET_PITCH,
     GET_YAW,
     GET_HEADING,
-    GET_TEMP
-}imu_command_type_t;
+    GET_TEMP,
+    DEINIT
+}sens_command_type_t;
 
 typedef enum{
     IF_EQUAL_THEN,
@@ -111,10 +112,10 @@ typedef struct{
 
 typedef struct{
     sensors_id_t sensor;
-    imu_command_type_t type;
+    sens_command_type_t type;
     uint8_t mode;
     uint16_t calibration_steps;
-}imu_sens_command_t;
+}sensor_command_t;
 
 typedef struct{
     logic_command_type type;
@@ -128,7 +129,7 @@ typedef struct{
 typedef union payload
 {
     robot_command_t robcmd;
-    imu_sens_command_t imucmd;
+    sensor_command_t senscmd;
     logic_command_t logiccmd;
 }payload_t;
 

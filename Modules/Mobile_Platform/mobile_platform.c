@@ -535,7 +535,7 @@ void Robot_UpdateMotionStatus(Mobile_Platform_t* robot){
     
     if( xSemaphoreTake(robot->handle->access_rob_data, 10) == pdPASS){
 
-        if (Sensor_GetState(IMU)){
+        if (Sensor_GetState(IMU) == SENSOR_WORKING){
             //IMU euler orient
             Sensor_GetValue(IMU, &robot->handle->imu_orient);
         } else {

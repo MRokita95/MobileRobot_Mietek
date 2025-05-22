@@ -12,6 +12,6 @@ typedef union payload logic_payload_t;
 
 bool LogicExecutor_Ready(logic_payload_t* data);
 
-void LogicExecutor_Dispatch(logic_payload_t* data, status_update_cb cb);
+void LogicExecutor_Dispatch(logic_payload_t* data, status_notif_cb cb);
 
 #endif

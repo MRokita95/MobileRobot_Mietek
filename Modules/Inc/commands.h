@@ -11,7 +11,7 @@
 
 
 typedef bool (*guard_cb)(payload_t* data);
-typedef void (*dispatcher_cb)(payload_t* data, status_update_cb cb);
+typedef void (*dispatcher_cb)(payload_t* data, status_notif_cb cb);
 
 typedef enum {
     NORMAL_SEVERITY,
@@ -43,6 +43,8 @@ typedef enum{
 
 
 command_buff_status_t Command_New(command_pcb_t command, command_severity_t severity);
+
+void Command_ResetQueue(command_severity_t severity);
 
 void Management_Task(void);
 

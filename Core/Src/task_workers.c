@@ -12,7 +12,6 @@
 #include "commands.h"
 #include "tracing.h"
 #include "monitoring.h"
-#include "events.h"
 
 #define CALIB_CNT     100u
 #define MESSAGE_LENGTH 120u
@@ -50,7 +49,6 @@ void vTask_Communication(void const * argument);
 void vTask_Sensors(void const * argument);
 void vTask_Management(void const * argument);
 void vTask_Monitoring(void const * argument);
-void vTask_Event(void const * argument);
 void vTask_CommandsSched(void const * argument);
 
 char message_buffer[MESSAGE_LENGTH];
@@ -100,20 +98,11 @@ static Task_t Tasks[TASK_NUMBERS] =
 
     [MONITOR_TASK] = {
 				.task_name = "Monitor Task",
-				.task_active = 0,
+				.task_active = 1,
 				.task_function = vTask_Monitoring,
 				.priority = osPriorityNormal,
                 .stack_size = configMINIMAL_STACK_SIZE,
                 .frequency = MONITOR_TASK_FREQUENCY
-		},
-
-    [EVENT_TASK] = {
-				.task_name = "Event Task",
-				.task_active = 0,
-				.task_function = vTask_Event,
-				.priority = osPriorityAboveNormal,
-                .stack_size = configMINIMAL_STACK_SIZE,
-                .frequency = EVENT_TASK_FREQUENCY
 		},
 
     [COMMANDS_TASK] = {
@@ -160,7 +149,6 @@ void TasksWorkers_Init(){
   Trace_InitAccessInstances(&robot);
   Monitorig_RegisterRobot(&robot);
   Monitoring_Init();
-  Event_Task_Register(vTask_Event);
 }
 
 
@@ -253,24 +241,6 @@ void vTask_Monitoring(void const * argument) {
       vTaskDelayUntil( &xNextWakeTime, xBlockTime );
 
       Monitoring_Execute();
-  }
-}
-
-
-void vTask_Event(void const * argument) {
-
-      
-
-    TickType_t xNextWakeTime;
-
-    const TickType_t xBlockTime = Tasks[EVENT_TASK_FREQUENCY].frequency/portTICK_RATE_MS;
-    xNextWakeTime = xTaskGetTickCount();
-
-    for(;;){
-
-      vTaskDelayUntil( &xNextWakeTime, xBlockTime );
-
-      Event_Handle();
   }
 }
 

@@ -199,3 +199,9 @@ void Trace_FlushData(trace_data_t *data, uint16_t *size){
 uint16_t Trace_DataCnt(){
     return m_trace_handler.counter;
 }
+
+void Trace_ResetQueue(){
+    m_trace_handler.read_pointer = 0;
+    m_trace_handler.write_pointer = 0;
+    m_trace_handler.counter = 0;
+}

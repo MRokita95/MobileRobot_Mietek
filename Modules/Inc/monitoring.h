@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #include "FreeRTOS.h"
-#include "events.h"
+
 #include "robot.h"
 
 typedef enum{
@@ -21,6 +21,11 @@ typedef enum{
     IMU_DEVICE,
 } monitored_devices_t;
 
+typedef enum{
+    MON_ENABLED,
+    MON_DISABLED
+} monitoring_state_t;
+
 union value
 {
     uint8_t u8_value;
@@ -31,9 +36,11 @@ union value
 
 typedef bool (*action_cb)(void);
 typedef bool (*conditional_cb)(void);
+typedef void (*reaction_cb)(void);
 
 typedef struct{
-    bool active;
+    monitoring_state_t state;
+    reaction_cb reaction;
     uint8_t samples;
     check_type_t type;
     conditional_cb condition;
@@ -44,19 +51,17 @@ typedef struct{
 
     union value high_limit;
     union value low_limit;
-
-    event_t event_below_limit;
-    event_t event_above_limit;
 }check_param_t;
 
 typedef struct{
+    monitoring_state_t state;
+    reaction_cb reaction;
     conditional_cb condition;
     uint8_t interval;
     uint8_t samples;
     void (*init)(void*);
     void (*init2)(void*);
     action_cb action;
-    event_t event_notif;
     void* dev_instance;
     monitored_devices_t dev_id;
 }check_action_t;
@@ -68,6 +73,6 @@ void Monitorig_RegisterRobot(Mobile_Platform_t* robot);
 
 void Monitoring_Execute();
 
-
+void Monitoring_Setup(monitoring_state_t state);
 
 #endif

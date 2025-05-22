@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "robot.h"
+#include "sensors_common.h"
 
 #define ROB_APP_ID  0x10u
 #define MEM_APP_ID  0x11u
@@ -25,6 +26,9 @@
 #define TR_DATA_FNC_ID 0x01u
 #define TR_TIMEOUT_FNC_ID 0x02u
 
+#define HK_DATA_FNC_ID 0x01u
+#define HK_TIMEOUT_FNC_ID 0x02u
+
 typedef struct {
     uint8_t roll;
     uint8_t pitch;
@@ -35,9 +39,10 @@ typedef struct {
 typedef struct {
     robot_status_t current_state;
     robot_mode_t active_mode;
+    sensor_status_t imu_status;
     int32_t speed_setpoint;
     int32_t right_wheel_speed;
     int32_t left_wheel_speed;
-} __attribute__((packed)) robot_status_data_t;
+} __attribute__((packed)) hk_status_data_t;
 
 #endif

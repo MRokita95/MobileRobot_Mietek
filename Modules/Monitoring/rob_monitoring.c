@@ -35,6 +35,6 @@ bool RobotMon_Stuck_Check(void){
 
         return true;
     }
-
+    return false;
 }
 
