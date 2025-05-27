@@ -93,7 +93,7 @@ param_ret_status_t Param_Get(uint16_t id, void* value){
 
 param_ret_status_t Param_SaveToFlash(void){
 
-    uint32_t block[STORED_PARAM_SIZE];
+    static uint32_t block[STORED_PARAM_SIZE];
     uint16_t words = 0;
 
 
@@ -125,8 +125,8 @@ param_ret_status_t Param_SaveToFlash(void){
 }
 
 param_ret_status_t Param_LoadFromFlash(void){
-    uint32_t words_block[STORED_PARAM_SIZE];
-    uint8_t block[STORED_PARAM_SIZE];
+    static uint32_t words_block[STORED_PARAM_SIZE];
+    static uint8_t block[STORED_PARAM_SIZE];
     uint16_t bytes = 0u;
 
     uint32_t store_word;

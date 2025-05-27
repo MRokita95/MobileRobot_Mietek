@@ -11,6 +11,7 @@
 #define SENSOR_APP_ID   0x13u
 #define HK_APP_ID       0x14u
 #define LOGIC_APP_ID    0x20u
+#define GENERAL_APP_ID    0x19u
 
 typedef enum{
     UNDEF = 0,
@@ -24,7 +25,9 @@ typedef enum{
     MANUAL_START,
     MANUAL_STOP,
     AUTOPATH_START,
-    AUTOPATH_STOP
+    AUTOPATH_STOP,
+    SAFE_RETURN,
+    RESET_POS
 } robcommand_type_t;
 
 typedef enum{
@@ -45,7 +48,9 @@ typedef enum{
     IF_LESS_THEN,
     IF_BIGGER_THEN,
     VAR_ASSIGN_VALUE,
-    LOOP
+    LOOP,
+    VAR_ARITH_ADD,
+    VAR_ARITH_SUB
 }logic_command_type;
 
 #define MAX_CUSTOM_VARS (10)
@@ -89,6 +94,14 @@ typedef enum{
     LA_SYSTEM_SHUTDOWN
 }logic_action_type;
 
+typedef enum{
+    GA_START_MONITORINGS,
+    GA_STOP_MONITORINGS,
+    GA_RESET_CMD_QUEUE,
+    GA_RESET_TRACE_QUEUE,
+    GA_SET_PARAM,
+}general_action_type;
+
 typedef union{
     struct control_bits{
         uint8_t up : 1;
@@ -125,12 +138,18 @@ typedef struct{
     Mobile_Platform_t* robot;
 }logic_command_t;
 
+typedef struct{
+    general_action_type type;
+    uint16_t param_id;
+    int32_t value;
+}general_command_t;
 
 typedef union payload
 {
     robot_command_t robcmd;
     sensor_command_t senscmd;
     logic_command_t logiccmd;
+    general_command_t gencmd;
 }payload_t;
 
 

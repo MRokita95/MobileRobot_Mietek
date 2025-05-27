@@ -28,4 +28,6 @@ pid_output_t PID_Loop(PID_handle_t pid_instance, pid_input_t input, pid_input_t 
 
 void PID_Reset(PID_handle_t pid_instance, bool error_only);
 
+void PID_SetupParams(PID_handle_t pid, const PID_parameters_t* parameters);
+
 #endif

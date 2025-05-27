@@ -20,6 +20,8 @@
 
 #define MANUAL_SPEED 150 // [mm/s]
 
+#define SAFE_SPEED 120 // [mm/s]
+
 #define MINIMAL_SPEED 5 // [mm/s]
 
 typedef struct {
@@ -63,9 +65,9 @@ typedef enum{
 } movement_phase_t;
 
 
-void HK_Init(Mobile_Platform_t* robot);
+void LOG_Init(Mobile_Platform_t* robot);
 
-void HK_Update(Mobile_Platform_t* robot);
+void LOG_Update(Mobile_Platform_t* robot);
 
 void HK_Setpoints(void* setpoint, current_setpoint_t setpoint_type);
 
@@ -86,5 +88,9 @@ void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms);
 void Robot_SetMode(Mobile_Platform_t* robot, robot_mode_t mode);
 
 void Robot_ManualCtrl(Mobile_Platform_t* robot, manual_ctrl_command_t ctrl);
+
+void Robot_SafeReturn(Mobile_Platform_t* robot);
+
+void Robot_ResetCoord(Mobile_Platform_t* robot);
 
 #endif

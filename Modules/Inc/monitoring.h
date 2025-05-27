@@ -9,6 +9,8 @@
 
 #include "robot.h"
 
+#define MAX_CONDITIONS_CNT 2u
+
 typedef enum{
     UINT8_CHECK,
     UINT32_CHECK,
@@ -37,16 +39,20 @@ union value
 typedef bool (*action_cb)(void);
 typedef bool (*conditional_cb)(void);
 typedef void (*reaction_cb)(void);
+typedef union value (*get_value_cb)(uint8_t);
 
 typedef struct{
     monitoring_state_t state;
     reaction_cb reaction;
     uint8_t samples;
+    uint8_t interval;
     check_type_t type;
-    conditional_cb condition;
+    conditional_cb condition[MAX_CONDITIONS_CNT];
+    get_value_cb getval;
+    uint8_t param_id;
     
     union value current_value;
-    union value prev_value;
+    union value prev_value[2];
     union value avg_value;
 
     union value high_limit;
@@ -56,11 +62,9 @@ typedef struct{
 typedef struct{
     monitoring_state_t state;
     reaction_cb reaction;
-    conditional_cb condition;
+    conditional_cb condition[MAX_CONDITIONS_CNT];
     uint8_t interval;
     uint8_t samples;
-    void (*init)(void*);
-    void (*init2)(void*);
     action_cb action;
     void* dev_instance;
     monitored_devices_t dev_id;

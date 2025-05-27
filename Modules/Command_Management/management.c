@@ -185,6 +185,8 @@ static bool deserialize_rob_command(robcommand_type_t cmd_type, command_pcb_t* c
     case AUTOPATH_STOP:
     case MANUAL_START:
     case MANUAL_STOP:
+    case RESET_POS:
+    case SAFE_RETURN:
         cmd->payload.robcmd.type = cmd_type;
         cmd_ok = true;
         break;
@@ -308,7 +310,7 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
             break;
         }
 
-    case PAR_APP_ID:
+    case PAR_APP_ID:    //moved to general executor
         switch (task->appdata.function_id)
         {
         case PARAM_SET_FNC_ID:
@@ -386,6 +388,25 @@ static task_exec_status_t send_for_execution(comm_task_frame_t* task){
         command.apid = LOGIC_APP_ID;
         command.dispatcher = LogicExecutor_Dispatch;
         command.guard = LogicExecutor_Ready;
+        command_buff_status_t buff_status = Command_New(command, NORMAL_SEVERITY);
+        if (buff_status != BUFF_OK){
+            status = FAILED_EXEC;
+            m_task_response.task_error_code = (uint16_t)buff_status;
+        }
+        break;
+    }
+
+    case GENERAL_APP_ID:
+    {
+        command_pcb_t command;
+        command.payload.gencmd.type = task->appdata.function_id;
+        if (command.payload.gencmd.type == GA_SET_PARAM){
+            memcpy(&command.payload.gencmd.param_id,  &task->appdata.parameters[0], 2);
+            memcpy(&command.payload.gencmd.value,  &task->appdata.parameters[2], 4);
+        }
+        command.apid = GENERAL_APP_ID;
+        command.dispatcher = GeneralExecutor_Dispatch;
+        command.guard = GeneralExecutor_Ready;
         command_buff_status_t buff_status = Command_New(command, NORMAL_SEVERITY);
         if (buff_status != BUFF_OK){
             status = FAILED_EXEC;

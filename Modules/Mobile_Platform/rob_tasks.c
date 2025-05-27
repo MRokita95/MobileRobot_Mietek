@@ -60,6 +60,16 @@ static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
         Robot_SetSpeed(robot, 0);
         Robot_StartTimer(robot, cmd->time);
         break;
+
+    case SAFE_RETURN:
+        ROB_DEBUG("SAFE RETURN...\r\n");
+        Robot_SafeReturn(robot);
+        break;
+
+    case RESET_POS:
+        ROB_DEBUG("RESET POSITION...\r\n");
+        Robot_ResetCoord(robot);
+        break;
     
     default:
         ROB_DEBUG("UNDEFINED COMMAND...\r\n");

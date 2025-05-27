@@ -1,5 +1,5 @@
 #include "rob_monitoring.h"
-
+#include "sensors_common.h"
 #include "robot.h"
 
 
@@ -14,7 +14,7 @@ void RobotMon_RegisterInstance(Mobile_Platform_t* robot){
     m_robot = robot;
 }
 
-bool RobotMon_Stuck_Condition(void){
+bool RobotMon_OnMovement(void){
     return Robot_Status(m_robot) == ROB_IN_PROGRESS;
 }
 
@@ -36,5 +36,24 @@ bool RobotMon_Stuck_Check(void){
         return true;
     }
     return false;
+}
+
+
+bool ImuMon_ActiveCheck(){
+    return Sensor_GetState(IMU) == SENSOR_WORKING;
+}
+
+union value ImuMon_GetAngle(uint8_t param){
+    union value value = {.f_value = 0};
+    euler_angles_t angle;
+    Sensor_GetValue(IMU, &angle);
+    if (param == 0){
+        //ROLL
+        value.f_value = angle.roll;
+    } else if (param == 1){
+        //PITCH
+        value.f_value = angle.pitch;
+    }
+    return value;
 }
 

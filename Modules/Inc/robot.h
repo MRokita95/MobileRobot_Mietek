@@ -25,7 +25,7 @@
 
 #define MOBILE_PLATFORM_CNT 1
 
-#define HK_UPDATE 1000 /*ms*/
+#define LOG_UUPDATE_PERIOD 1000 /*ms*/
 
 typedef struct robot_internal_state_t* rob_handle_t;
 

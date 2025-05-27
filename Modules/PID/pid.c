@@ -8,6 +8,7 @@
 #include "pid.h"
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
+#include "string.h"
 
 PID_handle_t PID_Init(const PID_parameters_t* parameters)
 {
@@ -83,5 +84,13 @@ void PID_Reset(PID_handle_t pid, bool error_only)
         pid->sample_time = 0u;
         pid->prev_error = 0;
         pid->last_tick = HAL_GetTick();
+    }
+}
+
+void PID_SetupParams(PID_handle_t pid, const PID_parameters_t* parameters)
+{   
+    if (memcmp(pid->params, parameters, sizeof(PID_parameters_t)) != 0){
+        pid->params = parameters;
+        PID_Reset(pid, false);
     }
 }

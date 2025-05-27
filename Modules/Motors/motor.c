@@ -75,10 +75,12 @@ static void control_motor_pid(motor_handle_t* motor){
     if (!control_off){
         pid_output_t pwm_output = PID_Loop(motor->pid_handle, abs(motor->encoder.act_speed), setpoint);
         setPWM(&motor->speed, pwm_output);
-        //setPWM(&motor->speed, 0);
         
     } else {
         setPWM(&motor->speed, 0);
+
+        //check for parameters update if any
+        PID_SetupParams(motor->pid_handle, &motor->pid_params);
     }
 
 }

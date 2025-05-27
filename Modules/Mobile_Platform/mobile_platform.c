@@ -108,6 +108,7 @@ motor_handle_t motors[MOTORS_CNT] = {
     distance_mode_t distance;
     time_mode_t timer;
     rob_coord_t coordinares;
+    rob_coord_t prev_coordinates;
     euler_angles_t imu_orient;
     rob_coord_t setpoint_coord;
     rob_angle_t orient;
@@ -143,6 +144,10 @@ static inline int32_t max_signed(int32_t v1, int32_t v2) {
     } else {
         return (v1 > v2) ? v1 : v2;
     }
+}
+
+static void inline setup_prev_pos(Mobile_Platform_t* robot){
+    robot->handle->prev_coordinates = robot->handle->coordinares;
 }
 
 
@@ -526,7 +531,7 @@ void Robot_Init(Mobile_Platform_t* robot){
     add_parameter_map(KD_ID, &robot->motors[1]->pid_params.KD);
     add_parameter_map(ACCEL_SETP_ID, &robot->handle->acc_setpoint);
 
-    HK_Init(robot);
+    LOG_Init(robot);
 
     Robot_Stop(robot);
 }
@@ -586,6 +591,7 @@ void Robot_SetDistance(Mobile_Platform_t* robot, float distance) {
 
     if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
         
+        setup_prev_pos(robot);
         set_rob_mode(robot, DISTANCE_MODE);
         robot->handle->distance.mode_on = true;
         robot->handle->distance.actual_distance = 0;
@@ -613,6 +619,7 @@ void Robot_StartTimer(Mobile_Platform_t* robot, uint32_t ms)
 {
     if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
 
+        setup_prev_pos(robot);
         set_rob_mode(robot, TIMER_MODE);
         robot->handle->timer.mode_on = true;
         robot->handle->timer.start_time = (uint32_t)(HAL_GetTick()/portTICK_PERIOD_MS);
@@ -659,6 +666,8 @@ void Robot_MoveToPoint(Mobile_Platform_t* robot, int32_t speed, int32_t x_pos, i
 
     if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
 
+        setup_prev_pos(robot);
+
         set_rob_mode(robot, POINT_MODE);
 
         //Get relative distance to the position
@@ -695,6 +704,8 @@ void Robot_MoveToPoint(Mobile_Platform_t* robot, int32_t speed, int32_t x_pos, i
 void Robot_Rotate(Mobile_Platform_t* robot, int32_t speed, int16_t angle_setpoint) {
 
     if( xSemaphoreTake(robot->handle->activate_mode, 10) == pdPASS){
+        
+        setup_prev_pos(robot);
 
         robot->speed_setpoint = speed;
 
@@ -752,19 +763,8 @@ void Robot_Stop(Mobile_Platform_t* robot) {
 void Robot_Task(Mobile_Platform_t* robot) {
 
     if (Robot_Status(robot) == ROB_IDLE){
-
         /* no commands ongoing - there is a good time to check for motion parameters update */
-        check_parameters_update(robot);
-
-        // bool cmd_on = Execute_Command(robot);
-
-        // if (cmd_on){ 
-        //     ROB_DEBUG("RUNNING COMMAND...\r\n");
-        // } else {
-        //     /* no commands ongoing - there is a good time to check for motion parameters update */
-        //     check_parameters_update(robot);
-        // }
-        
+        check_parameters_update(robot);  
     } else {
         eval_rob_state(robot);
     }
@@ -776,7 +776,7 @@ void Robot_Task(Mobile_Platform_t* robot) {
     }
 
     //HouseKeeping Queue Send
-    HK_Update(robot);
+    LOG_Update(robot);
 
 }
 
@@ -866,4 +866,27 @@ euler_angles_t Robot_GetOrient(Mobile_Platform_t* robot) {
 
 int32_t Robot_GetWheelSpeed(Mobile_Platform_t* robot, robot_wheel wheel){
     return (int32_t)robot->handle->single_wheel_speed[wheel];
+}
+
+void Robot_SafeReturn(Mobile_Platform_t* robot){
+
+    Robot_MoveToPoint(robot, SAFE_SPEED, 
+        robot->handle->prev_coordinates.x_pos, 
+        robot->handle->prev_coordinates.y_pos);
+}
+
+void Robot_ResetCoord(Mobile_Platform_t* robot){
+
+    const uint32_t wait_time = 100; 
+    if( xSemaphoreTake(robot->handle->access_rob_data, wait_time) == pdPASS){
+        robot->handle->coordinares.x_pos = 0;
+        robot->handle->coordinares.y_pos = 0;
+        robot->handle->coordinares.z_pos = 0;
+        robot->handle->prev_coordinates.x_pos = 0;
+        robot->handle->prev_coordinates.y_pos = 0;
+        robot->handle->prev_coordinates.z_pos = 0;
+        xSemaphoreGive(robot->handle->access_rob_data);
+
+        End_Command_Execution(robot, DONE_OK);
+    }
 }

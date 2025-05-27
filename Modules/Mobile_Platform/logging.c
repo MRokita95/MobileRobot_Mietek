@@ -43,15 +43,15 @@ static char* robot_status_to_msg(robot_status_t status){
     return status_msg;
 }
 
-void HK_Init(Mobile_Platform_t* robot){
+void LOG_Init(Mobile_Platform_t* robot){
 
     xHKQueue = xQueueCreateStatic(QUEUE_LENGTH, MESSAGE_PTR, queue_buffer, &xStaticQueue);
     configASSERT(xHKQueue);
 }
 
-void HK_Update(Mobile_Platform_t* robot){
+void LOG_Update(Mobile_Platform_t* robot){
 
-    if ((HAL_GetTick() - last_update) < HK_UPDATE){
+    if ((HAL_GetTick() - last_update) < LOG_UUPDATE_PERIOD){
         return;
     }
 

@@ -15,6 +15,11 @@
         "robot.h": "c",
         "freertos.h": "c",
         "stdlib.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "stdint.h": "c",
+        "param_handle.h": "c",
+        "logic_executor.h": "c",
+        "application_defs.h": "c",
+        "commands_ops.h": "c"
     }
 }
