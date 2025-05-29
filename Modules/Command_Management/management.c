@@ -491,6 +491,6 @@ void Management_Task(){
                 task_buff[idx].header.msg_id = PACKET_HEADER_READ;
             }
         }
-        Commands_Scheduler_Resume();
+        Commands_Scheduler_Resume(FROM_TASK);
     }
 }

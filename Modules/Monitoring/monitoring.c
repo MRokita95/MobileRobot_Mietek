@@ -154,8 +154,8 @@ void Monitoring_Execute(){
         if (check->type == FLOAT_CHECK){
             check->avg_value.f_value = (check->prev_value[0].f_value + check->prev_value[1].f_value + check->current_value.f_value) / 3;
         }
-        check->prev_value[0] = check->current_value;
         check->prev_value[1] = check->prev_value[0];
+        check->prev_value[0] = check->current_value;
     }
 }
 

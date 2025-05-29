@@ -40,7 +40,10 @@ typedef enum{
     BUFF_NOK,
 } command_buff_status_t;
 
-
+typedef enum{
+    FROM_TASK,
+    FROM_INTERRUPT
+}resume_source_t;
 
 command_buff_status_t Command_New(command_pcb_t command, command_severity_t severity);
 
@@ -50,7 +53,7 @@ void Management_Task(void);
 
 void Commands_Scheduler(void);
 
-void Commands_Scheduler_Resume(void);
+void Commands_Scheduler_Resume(resume_source_t source);
 
 void Commands_Scheduler_Init(TaskHandle_t xHandle);
 

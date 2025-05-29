@@ -425,7 +425,11 @@ static int32_t speed_profiler(Mobile_Platform_t* robot){
         float dt_s = (float)dt/1000.f;
         if (abs(speed_setp) > abs(next_speed)){
 
-            speed_setp = speed_setp - (int32_t)((float)dt_s * robot->handle->acc_setpoint);
+            if (speed_setp > 0){
+                speed_setp = speed_setp - (int32_t)((float)dt_s * robot->handle->acc_setpoint);
+            } else if (speed_setp < 0){
+                speed_setp = speed_setp + (int32_t)((float)dt_s * robot->handle->acc_setpoint);
+            }
 
             if (abs(speed_setp) <= abs(next_speed)){
                 speed_setp = next_speed;
@@ -870,9 +874,10 @@ int32_t Robot_GetWheelSpeed(Mobile_Platform_t* robot, robot_wheel wheel){
 
 void Robot_SafeReturn(Mobile_Platform_t* robot){
 
-    Robot_MoveToPoint(robot, SAFE_SPEED, 
-        robot->handle->prev_coordinates.x_pos, 
-        robot->handle->prev_coordinates.y_pos);
+    float distance = (float)sqrt((robot->handle->prev_coordinates.x_pos*robot->handle->prev_coordinates.x_pos) +
+    (robot->handle->prev_coordinates.y_pos*robot->handle->prev_coordinates.y_pos));
+    Robot_SetSpeed(robot, SAFE_SPEED);
+    Robot_SetDistance(robot, -distance);    //we're going backwards on the same line
 }
 
 void Robot_ResetCoord(Mobile_Platform_t* robot){

@@ -104,9 +104,6 @@ command_buff_status_t Command_New(command_pcb_t command, command_severity_t seve
     (cmd)->id = ringbuff->write_idx;
     (cmd)->status = IDLE;
 
-    if (ringbuff->incoming_notif != NULL){
-        ringbuff->incoming_notif();
-    }
 
     ringbuff->write_idx++;
     if (ringbuff->write_idx >= ringbuff->max_idx){
@@ -115,6 +112,10 @@ command_buff_status_t Command_New(command_pcb_t command, command_severity_t seve
 
     if (ringbuff->write_idx == ringbuff->read_idx){
         ringbuff->buff_status = BUFF_FULL;
+    }
+
+    if (ringbuff->incoming_notif != NULL){
+        ringbuff->incoming_notif();
     }
 
     return ringbuff->buff_status;

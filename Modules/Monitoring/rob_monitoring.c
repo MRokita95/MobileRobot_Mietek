@@ -15,7 +15,15 @@ void RobotMon_RegisterInstance(Mobile_Platform_t* robot){
 }
 
 bool RobotMon_OnMovement(void){
-    return Robot_Status(m_robot) == ROB_IN_PROGRESS;
+    if (Robot_Status(m_robot) != ROB_IN_PROGRESS){
+        return false;
+    }
+    robot_mode_t mode = Robot_ActiveMode(m_robot);
+    bool on_moving_mode = (mode == TIMER_MODE && m_robot->speed_setpoint > 0) || 
+                        (mode == POINT_MODE) || 
+                        (mode == ORIENT_MODE) || 
+                        (mode == DISTANCE_MODE);
+    return on_moving_mode;
 }
 
 bool RobotMon_Stuck_Check(void){
@@ -33,6 +41,8 @@ bool RobotMon_Stuck_Check(void){
         return true;
     } else if (abs_left_wheel_speed < (abs_right_wheel_speed * CRITICAL_DIFF_FACTOR)){
 
+        return true;
+    } else if (abs_left_wheel_speed < CRITICAL_WHEEL_SPEED && abs_right_wheel_speed < CRITICAL_WHEEL_SPEED){
         return true;
     }
     return false;

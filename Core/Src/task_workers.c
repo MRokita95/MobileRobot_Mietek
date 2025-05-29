@@ -80,7 +80,7 @@ static Task_t Tasks[TASK_NUMBERS] =
 
     [SENSOR_TASK] = {
 				.task_name = "Sensors Task",
-				.task_active = 0,
+				.task_active = 1,
 				.task_function = vTask_Sensors,
 				.priority = osPriorityNormal,
                 .stack_size = configMINIMAL_STACK_SIZE+125,
@@ -117,7 +117,6 @@ static Task_t Tasks[TASK_NUMBERS] =
 
 
 IMU_Handle_t imu_sensor = NULL;
-IMU_ReturnCode_t calibration_status;
 
 Mobile_Platform_t robot;
 
@@ -145,7 +144,6 @@ void TasksWorkers_Init(){
   Param_Initialize();
   Robot_Init(&robot);
   Commands_Scheduler_Init(Tasks[COMMANDS_TASK].handle);
-  //imu_sensor = Sensor_Init(IMU);
   Trace_InitAccessInstances(&robot);
   Monitorig_RegisterRobot(&robot);
   Monitoring_Init();
@@ -233,7 +231,7 @@ void vTask_Monitoring(void const * argument) {
 
     TickType_t xNextWakeTime;
 
-    const TickType_t xBlockTime = Tasks[MONITOR_TASK_FREQUENCY].frequency/portTICK_RATE_MS;
+    const TickType_t xBlockTime = Tasks[MONITOR_TASK].frequency/portTICK_RATE_MS;
     xNextWakeTime = xTaskGetTickCount();
 
     for(;;){
@@ -264,12 +262,12 @@ void vTask_CommandsSched(void const * argument){
 void Robot_Application1()
 {
 	static int i = 0;
-	if (i == 0){
-		ROBOT_WAIT(2000);
-		ROBOT_MOVE_SPEED(200, 150);
-		ROBOT_WAIT(2000);
-    Commands_Scheduler_Resume();
-		i = 1;
-	}
+	//if (i == 0){
+		ROBOT_WAIT(1000);
+		ROBOT_MOVE_SPEED(200, 2000);
+		ROBOT_WAIT(1000);
+    Commands_Scheduler_Resume(FROM_INTERRUPT);
+		i += 1;
+	//}
 
 }

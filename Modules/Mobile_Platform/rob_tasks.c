@@ -31,6 +31,7 @@ static void exec_type(Mobile_Platform_t *robot, robot_command_t* cmd){
     case STOP_ROB:
         ROB_DEBUG("STOP/MANU/AUTO ROB CMD...\r\n");
         Robot_Stop(robot);
+        End_Command_Execution(robot, DONE_OK);
         break;
 
     case RUN_FOR_TIME:

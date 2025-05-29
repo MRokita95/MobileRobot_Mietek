@@ -4,13 +4,16 @@
 #include "task.h"
 #include "timers.h"
 
-#define NOTIF_VALUE 1u
+#define NORMAL_NOTIF_VALUE 1u
+#define CRITICAL_NOTIF_VALUE 2u
 
 typedef enum{
     ST_INIT,
     ST_SELECTION,
     ST_DISPATCH,
     ST_IN_PROGRESS,
+    ST_TIMEOUT,
+    ST_CRITICAL,
     ST_FINISH,
     ST_MAX
 }SchedEnum;
@@ -31,6 +34,8 @@ static SchedEnum init_handler(void);
 static SchedEnum select_handler(void);
 static SchedEnum dispatch_handler(void);
 static SchedEnum running_handler(void);
+static SchedEnum timeout_handler(void);
+static SchedEnum critical_handler(void);
 static SchedEnum finish_handler(void);
 static void command_status_notif(command_status_t status, int32_t retval);
 static void timeoutCallback(TimerHandle_t timer);
@@ -42,9 +47,12 @@ static SchedState_t m_scheduler = {
     .state_handler[ST_SELECTION] = select_handler,
     .state_handler[ST_DISPATCH] = dispatch_handler,
     .state_handler[ST_IN_PROGRESS] = running_handler,
+    .state_handler[ST_TIMEOUT] = timeout_handler,
+    .state_handler[ST_CRITICAL] = critical_handler,
     .state_handler[ST_FINISH] = finish_handler,
     .running_cmd = NULL,
 };
+
 
 static command_severity_t check_queues(uint16_t* count){
 
@@ -52,10 +60,73 @@ static command_severity_t check_queues(uint16_t* count){
     for (command_severity_t severity = CRITICAL_SEVERITY; (severity >= NORMAL_SEVERITY && severity <= CRITICAL_SEVERITY); severity--){
         *count = command_get_count(severity);
     	if (*count > 0){
-            return severity; 
+            return severity;
         }
     }
     return MAX_SEVERITY;
+}
+
+static void handle_transition(SchedEnum from, SchedEnum to){
+    
+    switch (from)
+    {
+    case ST_INIT:
+        if (to == ST_SELECTION){
+            command_status_notif(QUEUED, 0);
+        } else if (to == ST_FINISH){
+            command_release(m_scheduler.running_cmd);
+        }
+        break;
+
+    case ST_SELECTION:
+        if (to == ST_DISPATCH){
+            if (m_scheduler.running_cmd->timeout == 0){
+                m_scheduler.running_cmd->timeout = 12500; //because
+            }
+            command_status_notif(READY, 0);
+            //xTimerChangePeriod(m_scheduler.timerHandle, m_scheduler.running_cmd->timeout, 0);
+        }
+        break;
+
+    case ST_DISPATCH:
+        if (to == ST_IN_PROGRESS){
+            m_scheduler.running_cmd->dispatcher(&m_scheduler.running_cmd->payload, command_status_notif);
+            //xTimerStart(m_scheduler.timerHandle, 0);
+        }
+        break;
+
+    case ST_IN_PROGRESS:
+        if (to == ST_FINISH){
+            //do nothing
+        } else if (to == ST_CRITICAL){
+            command_status_notif(INTERRUPTED, 0);
+            //xTimerStop(m_scheduler.timerHandle, 0);
+        } else if (to == ST_TIMEOUT){
+            command_status_notif(TIMEOUT, 0);
+        }
+        break;
+    
+    case ST_CRITICAL:
+        if (to == ST_DISPATCH){
+            command_status_notif(READY, 0);
+        }
+        break;
+
+    case ST_FINISH:
+        if (to == ST_INIT){
+            if (m_scheduler.max_idx != 0){
+                command_release(m_scheduler.running_cmd);
+            }
+            uint16_t count;
+            if (check_queues(&count) == MAX_SEVERITY){
+                vTaskSuspend(m_scheduler.taskHandle);
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
 }
 
 static SchedEnum init_handler(){
@@ -65,10 +136,9 @@ static SchedEnum init_handler(){
     }
     command_buff_status_t buff_status = command_get_next(&m_scheduler.running_cmd, severity);
     if (buff_status == BUFF_EMPTY || command_get_status(m_scheduler.running_cmd) == EMPTY){
-        command_release(m_scheduler.running_cmd);
         return ST_FINISH;
     }
-    command_status_notif(QUEUED, 0);
+
     return ST_SELECTION;
 }
 
@@ -76,13 +146,10 @@ static SchedEnum select_handler(){
 
     if (command_get_status(m_scheduler.running_cmd) == QUEUED){
         if (m_scheduler.running_cmd->guard(&m_scheduler.running_cmd->payload)){
-            command_status_notif(READY, 0);
-            if (m_scheduler.running_cmd->timeout == 0){
-                m_scheduler.running_cmd->timeout = 125; //because
-            }
-            //xTimerChangePeriod(m_scheduler.timerHandle, m_scheduler.running_cmd->timeout, 0);
             return ST_DISPATCH;
         }
+    } else {
+        return ST_FINISH;
     }
     return ST_SELECTION;
 }
@@ -90,8 +157,6 @@ static SchedEnum select_handler(){
 static SchedEnum dispatch_handler(){
 
     if (command_get_status(m_scheduler.running_cmd) == READY){
-        m_scheduler.running_cmd->dispatcher(&m_scheduler.running_cmd->payload, command_status_notif);
-        //xTimerStart(m_scheduler.timerHandle, 0);
         return ST_IN_PROGRESS;
     }
     return ST_FINISH;
@@ -99,28 +164,39 @@ static SchedEnum dispatch_handler(){
 
 static SchedEnum running_handler(){
 
-    if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(m_scheduler.running_cmd->timeout)) == NOTIF_VALUE){
-        uint16_t counts;
-        if (check_queues(&counts) == CRITICAL_SEVERITY){
-            command_status_notif(INTERRUPTED, 0);
-        }
+    uint32_t notif_value = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(m_scheduler.running_cmd->timeout));
+
+    if (notif_value == NORMAL_NOTIF_VALUE){
+        return ST_FINISH;
+    } else if (notif_value == CRITICAL_NOTIF_VALUE){
+        return ST_CRITICAL;
     } else {
-        command_status_notif(TIMEOUT, 0);   //instead of timer?
+        return ST_TIMEOUT;
     }
-    //xTimerStop(m_scheduler.timerHandle, 0);
+}
+
+static SchedEnum timeout_handler(){
+
+    //Should I do sth with retval???
     return ST_FINISH;
+}
+
+static SchedEnum critical_handler(){
+
+    uint16_t counts;
+    if (check_queues(&counts) == CRITICAL_SEVERITY){
+        command_buff_status_t buff_status = command_get_next(&m_scheduler.running_cmd, CRITICAL_SEVERITY);
+        if (buff_status == BUFF_EMPTY || command_get_status(m_scheduler.running_cmd) == EMPTY){
+            return ST_FINISH;
+        }
+        return ST_DISPATCH;     //special treatment with guard check skipping
+    }
+    return ST_INIT; //mistake?
 }
 
 static SchedEnum finish_handler(){
 
     //Should I do sth with retval???
-    if (m_scheduler.max_idx != 0){
-        command_release(m_scheduler.running_cmd);
-    }
-    uint16_t count;
-    if (check_queues(&count) == MAX_SEVERITY){
-        vTaskSuspend(m_scheduler.taskHandle);
-    }
     return ST_INIT;
 }
 
@@ -138,12 +214,18 @@ static void timeoutCallback(TimerHandle_t timer){
 }
 
 static void sendNotification(){
-    xTaskNotify(m_scheduler.taskHandle, NOTIF_VALUE, eSetValueWithOverwrite);
+    xTaskNotify(m_scheduler.taskHandle, NORMAL_NOTIF_VALUE, eSetValueWithOverwrite);
+}
+
+static void sendCriticalNotification(){
+    xTaskNotify(m_scheduler.taskHandle, CRITICAL_NOTIF_VALUE, eSetValueWithOverwrite);
 }
 
 void Commands_Scheduler(){
 
     m_scheduler.next_state = m_scheduler.state_handler[m_scheduler.state]();
+
+    handle_transition(m_scheduler.state, m_scheduler.next_state);
 
     m_scheduler.state = m_scheduler.next_state;
 }
@@ -152,15 +234,17 @@ void Commands_Scheduler_Init(TaskHandle_t handle){
 
     command_buff_init();
 
-    command_add_incoming_notif(CRITICAL_SEVERITY, sendNotification);
+    command_add_incoming_notif(CRITICAL_SEVERITY, sendCriticalNotification);
 
     m_scheduler.taskHandle = handle;
     //m_scheduler.timerHandle = xTimerCreate("CommandTimeout", 100, pdFALSE, ( void * ) 0, timeoutCallback);
 }
 
-void Commands_Scheduler_Resume(){
+void Commands_Scheduler_Resume(resume_source_t source){
     // eTaskState state = eTaskGetState(m_scheduler.taskHandle);
-    // if (state == eSuspended){
+    if (source == FROM_TASK){
+        vTaskResume(m_scheduler.taskHandle);
+    } else if (source == FROM_INTERRUPT){
         xTaskResumeFromISR(m_scheduler.taskHandle);
-    // }
+    }
 }
